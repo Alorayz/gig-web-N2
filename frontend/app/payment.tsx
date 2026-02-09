@@ -31,13 +31,19 @@ export default function PaymentScreen() {
   } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
   // Check if terms are accepted
   useEffect(() => {
-    if (!selectedApp || !termsAccepted) {
-      router.replace('/select-app');
-    }
-  }, []);
+    // Small delay to allow state to be read
+    const timer = setTimeout(() => {
+      if (!selectedApp || !termsAccepted) {
+        router.replace('/select-app');
+      }
+      setIsChecking(false);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [selectedApp, termsAccepted]);
 
   const getAppIcon = () => {
     switch (selectedApp) {
