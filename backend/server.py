@@ -469,7 +469,7 @@ async def get_admin_payments(
     total = await db.payments.count_documents(query)
     
     return {
-        "payments": payments,
+        "payments": serialize_doc(payments),
         "total": total,
         "page": page,
         "pages": (total + limit - 1) // limit
