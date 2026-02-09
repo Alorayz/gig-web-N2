@@ -258,7 +258,7 @@ async def get_zip_codes_by_app(app_name: str, limit: int = 5):
 async def get_all_zip_codes():
     """Get all zip codes (admin only)"""
     zip_codes = await db.zip_codes.find().to_list(1000)
-    return zip_codes
+    return serialize_doc(zip_codes)
 
 @api_router.post("/zip-codes", dependencies=[Depends(verify_admin_token)])
 async def create_zip_code(zip_data: ZipCodeCreate):
