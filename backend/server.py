@@ -356,7 +356,7 @@ async def get_terms():
             "content_es": DEFAULT_TERMS_ES,
             "version": "1.0"
         }
-    return terms
+    return serialize_doc(terms)
 
 @api_router.post("/terms", dependencies=[Depends(verify_admin_token)])
 async def create_terms(content_en: str, content_es: str, version: str):
