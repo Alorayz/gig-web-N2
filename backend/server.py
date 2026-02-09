@@ -252,7 +252,7 @@ async def get_zip_codes_by_app(app_name: str, limit: int = 5):
         "expires_at": {"$gt": datetime.utcnow()}
     }).sort("availability_score", -1).limit(limit).to_list(limit)
     
-    return zip_codes
+    return serialize_doc(zip_codes)
 
 @api_router.get("/zip-codes")
 async def get_all_zip_codes():
