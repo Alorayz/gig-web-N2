@@ -309,13 +309,13 @@ async def get_guides_by_app(app_name: str):
         "app_name": app_name.lower(),
         "is_active": True
     }).sort("order", 1).to_list(100)
-    return guides
+    return serialize_doc(guides)
 
 @api_router.get("/guides")
 async def get_all_guides():
     """Get all guides"""
     guides = await db.guides.find().to_list(1000)
-    return guides
+    return serialize_doc(guides)
 
 @api_router.post("/guides", dependencies=[Depends(verify_admin_token)])
 async def create_guide(guide_data: GuideCreate):
