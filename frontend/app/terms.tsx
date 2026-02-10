@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useLanguageStore } from '../src/stores/languageStore';
+import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
 import { getTerms } from '../src/services/api';
 
@@ -56,7 +56,7 @@ export default function TermsScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={COLORS.accent} />
           <Text style={styles.loadingText}>{t('general.loading')}</Text>
         </View>
       </SafeAreaView>
@@ -68,11 +68,13 @@ export default function TermsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Ionicons name="document-text" size={40} color="#4CAF50" />
+        <Ionicons name="document-text" size={40} color={COLORS.accent} />
         <Text style={styles.title}>{t('terms.title')}</Text>
-        <Text style={styles.appBadge}>
-          {selectedApp?.toUpperCase()}
-        </Text>
+        <View style={styles.appBadge}>
+          <Text style={styles.appBadgeText}>
+            {selectedApp?.toUpperCase()}
+          </Text>
+        </View>
       </View>
 
       <ScrollView style={styles.termsContainer}>
@@ -84,7 +86,7 @@ export default function TermsScreen() {
           <Switch
             value={termsAccepted}
             onValueChange={setLocalTermsAccepted}
-            trackColor={{ false: '#333', true: '#4CAF50' }}
+            trackColor={{ false: COLORS.surface, true: COLORS.accent }}
             thumbColor={termsAccepted ? '#fff' : '#f4f3f4'}
           />
           <Text style={styles.acceptText}>{t('terms.accept')}</Text>
@@ -106,7 +108,7 @@ export default function TermsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
@@ -114,7 +116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#fff',
+    color: COLORS.textPrimary,
     marginTop: 16,
     fontSize: 16,
   },
@@ -122,37 +124,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: COLORS.primaryLight,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
     marginTop: 12,
   },
   appBadge: {
-    backgroundColor: '#4CAF50',
-    color: '#fff',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
+    marginTop: 12,
+  },
+  appBadgeText: {
+    color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
-    marginTop: 12,
   },
   termsContainer: {
     flex: 1,
     padding: 20,
   },
   termsText: {
-    color: '#ddd',
+    color: COLORS.textSecondary,
     fontSize: 14,
     lineHeight: 22,
   },
   footer: {
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: COLORS.primaryLight,
   },
   acceptContainer: {
     flexDirection: 'row',
@@ -160,7 +164,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   acceptText: {
-    color: '#fff',
+    color: COLORS.textPrimary,
     fontSize: 16,
     marginLeft: 12,
     flex: 1,
@@ -169,12 +173,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.accent,
     paddingVertical: 16,
     borderRadius: 30,
   },
   disabledButton: {
-    backgroundColor: '#333',
+    backgroundColor: COLORS.surface,
   },
   continueButtonText: {
     color: '#fff',
