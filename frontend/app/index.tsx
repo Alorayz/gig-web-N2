@@ -31,15 +31,20 @@ export default function HomeScreen() {
     setZipCodes,
     setGuides,
     setVoiceGuides,
+    lastSessionId,
+    setLastSessionId,
+    addPaidApp,
   } = useAppStore();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isLoadingPaidApps, setIsLoadingPaidApps] = useState(true);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
 
   useEffect(() => {
     resetForNewPurchase();
     initializeData();
     loadPaidApps();
+    checkPendingPayment();
   }, []);
 
   const initializeData = async () => {
@@ -64,6 +69,31 @@ export default function HomeScreen() {
       console.log('Error loading paid apps:', error);
     } finally {
       setIsLoadingPaidApps(false);
+    }
+  };
+
+  // Check if there's a pending payment to verify
+  const checkPendingPayment = async () => {
+    if (!lastSessionId) return;
+    
+    setIsCheckingPayment(true);
+    try {
+      const result = await verifyCheckoutSession(lastSessionId);
+      if (result.status === 'succeeded' && result.app_name) {
+        // Payment was successful!
+        addPaidApp(result.app_name);
+        setLastSessionId(null); // Clear the pending session
+        
+        // Reload paid apps from server
+        const paidResult = await getPaidApps(userId);
+        if (paidResult.paid_apps && paidResult.paid_apps.length > 0) {
+          setPaidApps(paidResult.paid_apps);
+        }
+      }
+    } catch (error) {
+      console.log('Error checking pending payment:', error);
+    } finally {
+      setIsCheckingPayment(false);
     }
   };
 
