@@ -64,13 +64,23 @@ export default function HomeScreen() {
           <Ionicons name="chevron-down" size={16} color={COLORS.accent} />
         </TouchableOpacity>
 
-        {/* Logo */}
+        {/* Professional Logo */}
         <View style={styles.logoContainer}>
-          <Image
-            source={require('../assets/images/logo.jpeg')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <View style={styles.logoIconWrapper}>
+            <View style={styles.logoIcon}>
+              <Ionicons name="location" size={50} color={COLORS.accent} />
+              <View style={styles.logoArrow}>
+                <Ionicons name="arrow-up-circle" size={28} color={COLORS.accentLight} />
+              </View>
+            </View>
+          </View>
+          <Text style={styles.logoTitle}>GIG</Text>
+          <Text style={styles.logoSubtitle}>ZipFinder</Text>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoBadgeText}>
+              {language === 'en' ? 'Find Your Gig' : 'Encuentra Tu Gig'}
+            </Text>
+          </View>
         </View>
 
         {/* Description */}
