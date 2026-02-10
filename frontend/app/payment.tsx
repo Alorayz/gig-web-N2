@@ -8,13 +8,14 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Linking,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useStripe, usePaymentSheet, PaymentSheetError } from '@stripe/stripe-react-native';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp, getStripeConfig } from '../src/services/api';
+import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -31,19 +32,193 @@ export default function PaymentScreen() {
   } = useAppStore();
   
   const [isChecking, setIsChecking] = useState(true);
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'verifying' | 'success' | 'failed'>('idle');
+  const [isLoading, setIsLoading] = useState(false);
+  const [paymentSheetReady, setPaymentSheetReady] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'loading' | 'ready' | 'processing' | 'success' | 'failed'>('idle');
   const [currentPaymentIntentId, setCurrentPaymentIntentId] = useState<string | null>(null);
+  
+  const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!selectedApp || !termsAccepted) {
         router.replace('/select-app');
+      } else {
+        setIsChecking(false);
+        // Initialize payment sheet when screen loads
+        initializePayment();
       }
-      setIsChecking(false);
     }, 100);
     return () => clearTimeout(timer);
   }, [selectedApp, termsAccepted]);
+
+  const initializePayment = async () => {
+    if (!selectedApp) return;
+    
+    setPaymentStatus('loading');
+    setIsLoading(true);
+    
+    try {
+      // Step 1: Create payment intent on backend
+      const paymentData = await createPaymentIntent(userId, selectedApp, termsAccepted);
+      setCurrentPaymentIntentId(paymentData.payment_intent_id);
+      
+      // Step 2: Initialize the Payment Sheet with the client secret
+      const { error } = await initPaymentSheet({
+        paymentIntentClientSecret: paymentData.client_secret,
+        merchantDisplayName: 'GIG ZipFinder',
+        style: 'automatic',
+        allowsDelayedPaymentMethods: false,
+        returnURL: 'gigzipfinder://payment-complete',
+        defaultBillingDetails: {
+          name: '',
+        },
+        appearance: {
+          colors: {
+            primary: COLORS.accent,
+            background: COLORS.background,
+            componentBackground: COLORS.surface,
+            componentText: COLORS.textPrimary,
+            secondaryText: COLORS.textSecondary,
+            componentDivider: COLORS.primaryLight,
+            icon: COLORS.accent,
+          },
+          shapes: {
+            borderRadius: 12,
+          },
+        },
+      });
+
+      if (error) {
+        console.error('PaymentSheet init error:', error);
+        setPaymentStatus('failed');
+        Alert.alert(
+          language === 'en' ? 'Error' : 'Error',
+          error.message || (language === 'en' ? 'Could not initialize payment' : 'No se pudo inicializar el pago')
+        );
+      } else {
+        setPaymentSheetReady(true);
+        setPaymentStatus('ready');
+      }
+    } catch (error: any) {
+      console.error('Payment initialization error:', error);
+      setPaymentStatus('failed');
+      Alert.alert(
+        language === 'en' ? 'Error' : 'Error',
+        error.response?.data?.detail || (language === 'en' ? 'Could not initialize payment' : 'No se pudo inicializar el pago')
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!paymentSheetReady || !currentPaymentIntentId) {
+      Alert.alert(
+        language === 'en' ? 'Please Wait' : 'Por Favor Espere',
+        language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
+      );
+      return;
+    }
+
+    setPaymentStatus('processing');
+
+    try {
+      // Present the Payment Sheet to collect payment details
+      const { error } = await presentPaymentSheet();
+
+      if (error) {
+        if (error.code === PaymentSheetError.Canceled) {
+          // User canceled - don't show error
+          setPaymentStatus('ready');
+          return;
+        }
+        
+        console.error('Payment error:', error);
+        setPaymentStatus('failed');
+        Alert.alert(
+          t('payment.failed'),
+          error.message || t('payment.tryAgain'),
+          [{ 
+            text: 'OK', 
+            onPress: () => {
+              setPaymentStatus('ready');
+              // Reinitialize for retry
+              initializePayment();
+            } 
+          }]
+        );
+        return;
+      }
+
+      // Payment successful! Now verify on backend
+      setPaymentStatus('success');
+      
+      try {
+        // Verify payment status with backend
+        const verifyResult = await confirmPayment(currentPaymentIntentId);
+        
+        if (verifyResult.status === 'succeeded') {
+          setPaymentIntentId(currentPaymentIntentId);
+          setPaymentComplete(true);
+          
+          // Load the content after confirmed payment
+          const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
+            getZipCodesByApp(selectedApp!),
+            getGuidesByApp(selectedApp!),
+            getGuidesByApp('google_voice'),
+          ]);
+
+          setZipCodes(zipCodesData);
+          setGuides(guidesData);
+          setVoiceGuides(voiceGuidesData);
+
+          // Navigate to results after short delay
+          setTimeout(() => {
+            router.replace('/results');
+          }, 2000);
+        } else {
+          // Payment verification failed
+          setPaymentStatus('failed');
+          Alert.alert(
+            t('payment.failed'),
+            language === 'en' 
+              ? 'Payment verification failed. Please contact support.' 
+              : 'La verificación del pago falló. Por favor contacte soporte.',
+            [{ text: 'OK', onPress: () => initializePayment() }]
+          );
+        }
+      } catch (verifyError) {
+        console.error('Verification error:', verifyError);
+        // Payment was made but verification failed - still navigate
+        setPaymentIntentId(currentPaymentIntentId);
+        setPaymentComplete(true);
+        
+        const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
+          getZipCodesByApp(selectedApp!),
+          getGuidesByApp(selectedApp!),
+          getGuidesByApp('google_voice'),
+        ]);
+
+        setZipCodes(zipCodesData);
+        setGuides(guidesData);
+        setVoiceGuides(voiceGuidesData);
+
+        setTimeout(() => {
+          router.replace('/results');
+        }, 2000);
+      }
+
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      setPaymentStatus('failed');
+      Alert.alert(
+        t('payment.failed'),
+        error.message || t('payment.tryAgain'),
+        [{ text: 'OK', onPress: () => initializePayment() }]
+      );
+    }
+  };
 
   const getAppIcon = () => {
     switch (selectedApp) {
@@ -63,80 +238,6 @@ export default function PaymentScreen() {
     }
   };
 
-  const handlePayment = async () => {
-    if (!selectedApp) {
-      Alert.alert('Error', 'No app selected');
-      return;
-    }
-
-    setProcessingPayment(true);
-    setPaymentStatus('processing');
-
-    try {
-      // Step 1: Create payment intent
-      const paymentData = await createPaymentIntent(userId, selectedApp, termsAccepted);
-      setCurrentPaymentIntentId(paymentData.payment_intent_id);
-      
-      // Step 2: In production, this would open Stripe's payment sheet
-      // For now, we simulate the payment process with the real Stripe intent
-      setPaymentStatus('verifying');
-      
-      // Step 3: Verify payment status with Stripe
-      // In a real implementation, you would use Stripe's PaymentSheet
-      // and the confirmation would happen automatically
-      
-      // Simulate verification delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Step 4: Confirm payment and get results
-      const result = await confirmPayment(paymentData.payment_intent_id);
-      
-      if (result.status === 'succeeded') {
-        setPaymentStatus('success');
-        setPaymentIntentId(paymentData.payment_intent_id);
-        setPaymentComplete(true);
-        
-        // Load the content only after confirmed payment
-        const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
-          getZipCodesByApp(selectedApp),
-          getGuidesByApp(selectedApp),
-          getGuidesByApp('google_voice'),
-        ]);
-
-        setZipCodes(zipCodesData);
-        setGuides(guidesData);
-        setVoiceGuides(voiceGuidesData);
-
-        // Show success message then navigate
-        setTimeout(() => {
-          router.replace('/results');
-        }, 1500);
-        
-      } else {
-        // Payment requires additional action or failed
-        setPaymentStatus('failed');
-        Alert.alert(
-          t('payment.failed'),
-          language === 'en' 
-            ? 'Your payment could not be processed. Please try again.' 
-            : 'Su pago no pudo ser procesado. Por favor intente de nuevo.',
-          [{ text: 'OK', onPress: () => setPaymentStatus('idle') }]
-        );
-      }
-
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      setPaymentStatus('failed');
-      Alert.alert(
-        t('payment.failed'),
-        error.response?.data?.detail || t('payment.tryAgain'),
-        [{ text: 'OK', onPress: () => setPaymentStatus('idle') }]
-      );
-    } finally {
-      setProcessingPayment(false);
-    }
-  };
-
   if (isChecking) {
     return (
       <SafeAreaView style={styles.container}>
@@ -152,14 +253,21 @@ export default function PaymentScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.successContainer}>
-          <View style={styles.successIcon}>
-            <Ionicons name="checkmark-circle" size={100} color={COLORS.accent} />
+          <View style={styles.successIconContainer}>
+            <Ionicons name="checkmark-circle" size={100} color={COLORS.success} />
           </View>
           <Text style={styles.successTitle}>{t('payment.success')}</Text>
           <Text style={styles.successSubtitle}>
-            {language === 'en' ? 'Loading your content...' : 'Cargando su contenido...'}
+            {language === 'en' 
+              ? 'Your payment has been confirmed!' 
+              : '¡Su pago ha sido confirmado!'}
           </Text>
-          <ActivityIndicator size="large" color={COLORS.accent} style={{ marginTop: 20 }} />
+          <Text style={styles.successMessage}>
+            {language === 'en' 
+              ? 'Loading your zip codes and guides...' 
+              : 'Cargando sus códigos postales y guías...'}
+          </Text>
+          <ActivityIndicator size="large" color={COLORS.accent} style={{ marginTop: 30 }} />
         </View>
       </SafeAreaView>
     );
@@ -203,15 +311,29 @@ export default function PaymentScreen() {
           </View>
         </View>
 
-        {/* Important Notice */}
-        <View style={styles.noticeContainer}>
-          <Ionicons name="information-circle" size={24} color={COLORS.warning} />
-          <Text style={styles.noticeText}>
-            {language === 'en' 
-              ? 'Content will be unlocked only after successful payment verification.' 
-              : 'El contenido se desbloqueará solo después de la verificación exitosa del pago.'}
-          </Text>
-        </View>
+        {/* Payment Ready Notice */}
+        {paymentStatus === 'ready' && (
+          <View style={styles.readyNotice}>
+            <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+            <Text style={styles.readyNoticeText}>
+              {language === 'en' 
+                ? 'Payment ready - Tap the button below to enter your card details' 
+                : 'Pago listo - Toque el botón de abajo para ingresar los datos de su tarjeta'}
+            </Text>
+          </View>
+        )}
+
+        {/* Loading Notice */}
+        {paymentStatus === 'loading' && (
+          <View style={styles.loadingNotice}>
+            <ActivityIndicator size="small" color={COLORS.accent} />
+            <Text style={styles.loadingNoticeText}>
+              {language === 'en' 
+                ? 'Preparing secure payment...' 
+                : 'Preparando pago seguro...'}
+            </Text>
+          </View>
+        )}
 
         {/* Security Badge */}
         <View style={styles.securityBadge}>
@@ -221,38 +343,71 @@ export default function PaymentScreen() {
 
         {/* Pay Button */}
         <TouchableOpacity
-          style={[styles.payButton, processingPayment && styles.payButtonDisabled]}
+          style={[
+            styles.payButton, 
+            (!paymentSheetReady || paymentStatus === 'processing') && styles.payButtonDisabled
+          ]}
           onPress={handlePayment}
-          disabled={processingPayment}
+          disabled={!paymentSheetReady || paymentStatus === 'processing'}
         >
-          {processingPayment ? (
+          {paymentStatus === 'loading' ? (
             <>
               <ActivityIndicator color="#fff" size="small" />
               <Text style={styles.payButtonText}>
-                {paymentStatus === 'verifying' ? t('payment.verifying') : t('payment.processing')}
+                {language === 'en' ? 'Loading...' : 'Cargando...'}
               </Text>
+            </>
+          ) : paymentStatus === 'processing' ? (
+            <>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.payButtonText}>{t('payment.processing')}</Text>
             </>
           ) : (
             <>
               <Ionicons name="card" size={24} color="#fff" />
-              <Text style={styles.payButtonText}>{t('payment.pay')}</Text>
+              <Text style={styles.payButtonText}>
+                {language === 'en' ? 'Pay $5.00 with Card' : 'Pagar $5.00 con Tarjeta'}
+              </Text>
             </>
           )}
         </TouchableOpacity>
 
         {/* Payment Methods */}
         <View style={styles.paymentMethods}>
-          <Ionicons name="card-outline" size={32} color={COLORS.textMuted} />
-          <Ionicons name="logo-apple" size={32} color={COLORS.textMuted} style={{ marginLeft: 16 }} />
-          <Ionicons name="logo-google" size={32} color={COLORS.textMuted} style={{ marginLeft: 16 }} />
+          <View style={styles.paymentMethodItem}>
+            <Ionicons name="card-outline" size={28} color={COLORS.textMuted} />
+          </View>
+          <View style={styles.paymentMethodItem}>
+            <Text style={styles.paymentMethodText}>VISA</Text>
+          </View>
+          <View style={styles.paymentMethodItem}>
+            <Text style={styles.paymentMethodText}>MC</Text>
+          </View>
+          <View style={styles.paymentMethodItem}>
+            <Text style={styles.paymentMethodText}>AMEX</Text>
+          </View>
         </View>
 
         {/* Stripe Logo */}
         <View style={styles.stripeInfo}>
           <Text style={styles.stripeText}>
-            {language === 'en' ? 'Payments processed by' : 'Pagos procesados por'} Stripe
+            {language === 'en' ? 'Secure payments by' : 'Pagos seguros por'} 
           </Text>
+          <Text style={styles.stripeBrand}>Stripe</Text>
         </View>
+
+        {/* Retry Button if failed */}
+        {paymentStatus === 'failed' && (
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={initializePayment}
+          >
+            <Ionicons name="refresh" size={20} color={COLORS.accent} />
+            <Text style={styles.retryButtonText}>
+              {language === 'en' ? 'Try Again' : 'Intentar de Nuevo'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -274,8 +429,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
-  successIcon: {
+  successIconContainer: {
     marginBottom: 20,
+    backgroundColor: `${COLORS.success}20`,
+    borderRadius: 60,
+    padding: 10,
   },
   successTitle: {
     fontSize: 28,
@@ -284,9 +442,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   successSubtitle: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
+    fontSize: 18,
+    color: COLORS.success,
     marginTop: 10,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 20,
+    textAlign: 'center',
   },
   scrollContent: {
     flexGrow: 1,
@@ -352,20 +517,37 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     flex: 1,
   },
-  noticeContainer: {
+  readyNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: `${COLORS.warning}20`,
+    backgroundColor: `${COLORS.success}15`,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     width: '100%',
     borderWidth: 1,
-    borderColor: COLORS.warning,
+    borderColor: `${COLORS.success}50`,
   },
-  noticeText: {
+  readyNoticeText: {
     fontSize: 13,
-    color: COLORS.warning,
+    color: COLORS.success,
+    marginLeft: 12,
+    flex: 1,
+  },
+  loadingNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${COLORS.accent}15`,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: `${COLORS.accent}50`,
+  },
+  loadingNoticeText: {
+    fontSize: 13,
+    color: COLORS.accent,
     marginLeft: 12,
     flex: 1,
   },
@@ -397,6 +579,8 @@ const styles = StyleSheet.create({
   },
   payButtonDisabled: {
     backgroundColor: COLORS.surface,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   payButtonText: {
     color: '#fff',
@@ -407,13 +591,52 @@ const styles = StyleSheet.create({
   paymentMethods: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
+    gap: 16,
+  },
+  paymentMethodItem: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+  },
+  paymentMethodText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.textMuted,
   },
   stripeInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 20,
   },
   stripeText: {
     fontSize: 12,
     color: COLORS.textMuted,
+  },
+  stripeBrand: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.textSecondary,
+    marginLeft: 4,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: COLORS.accent,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
