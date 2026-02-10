@@ -296,6 +296,66 @@ async def create_checkout_session(request: CheckoutSessionRequest):
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@api_router.post("/stripe/verify-checkout/{session_id}")
+async def verify_checkout_session(session_id: str):
+    """Verify a Stripe Checkout Session payment status"""
+    try:
+        # Retrieve the checkout session
+        session = stripe.checkout.Session.retrieve(session_id)
+        
+        if session.payment_status == 'paid':
+            # Update payment record in database
+            await db.payments.update_one(
+                {"stripe_payment_intent_id": session_id},
+                {"$set": {"status": "succeeded"}}
+            )
+            
+            # Also try to update by payment_intent if available
+            if session.payment_intent:
+                await db.payments.update_one(
+                    {"stripe_payment_intent_id": session.payment_intent},
+                    {"$set": {"status": "succeeded"}}
+                )
+            
+            return {
+                "status": "succeeded",
+                "payment_status": session.payment_status,
+                "customer_email": session.customer_details.email if session.customer_details else None
+            }
+        else:
+            return {
+                "status": session.payment_status,
+                "payment_status": session.payment_status
+            }
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/stripe/check-payment-by-email/{email}")
+async def check_payment_by_email(email: str, app_name: str):
+    """Check if a payment exists for an email and app"""
+    try:
+        # Search for recent checkout sessions with this email
+        sessions = stripe.checkout.Session.list(
+            limit=10,
+            expand=['data.payment_intent']
+        )
+        
+        for session in sessions.data:
+            if (session.customer_details and 
+                session.customer_details.email == email and
+                session.payment_status == 'paid'):
+                metadata = session.metadata or {}
+                if metadata.get('app_name', '').lower() == app_name.lower():
+                    return {
+                        "found": True,
+                        "status": "succeeded",
+                        "session_id": session.id
+                    }
+        
+        return {"found": False, "status": "not_found"}
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # ============== ZIP CODES ROUTES ==============
 
 @api_router.get("/zip-codes/{app_name}")
