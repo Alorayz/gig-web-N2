@@ -887,7 +887,7 @@ def create_pdf(guide_content, language, output_filename, app_type):
     story.append(Spacer(1, 20))
     
     # Introduction
-    story.append(Paragraph(content['intro'], styles['BodyText']))
+    story.append(Paragraph(content['intro'], styles['CustomBodyText']))
     story.append(Spacer(1, 20))
     
     # Requirements
