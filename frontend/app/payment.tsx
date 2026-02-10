@@ -183,6 +183,11 @@ export default function PaymentScreen() {
       setPaymentIntentId(currentSessionId);
       setPaymentComplete(true);
       
+      // Save this app as paid
+      if (selectedApp) {
+        addPaidApp(selectedApp);
+      }
+      
       const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
         getZipCodesByApp(selectedApp!),
         getGuidesByApp(selectedApp!),
