@@ -268,8 +268,9 @@ async def create_checkout_session(request: CheckoutSessionRequest):
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=f'{base_url}/results?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
-            cancel_url=f'{base_url}/payment?payment=cancelled',
+            # Use deep link for mobile app return
+            success_url=f'gigzipfinder://payment-success?session_id={{CHECKOUT_SESSION_ID}}&app_name={request.app_name}',
+            cancel_url=f'gigzipfinder://payment-cancel',
             metadata={
                 'user_id': request.user_id,
                 'app_name': request.app_name,
