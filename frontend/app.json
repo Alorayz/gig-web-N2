@@ -15,7 +15,9 @@
         "NSCameraUsageDescription": "Scan documents for verification",
         "NSPhotoLibraryUsageDescription": "Upload profile photos"
       },
-      "associatedDomains": ["applinks:gigzipfinder.app"]
+      "associatedDomains": [
+        "applinks:gigzipfinder.app"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -38,7 +40,10 @@
               "scheme": "gigzipfinder"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -65,8 +70,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
-      }
-    }
+        "projectId": "825a2de4-fffd-475e-afca-d9e0b3aa74aa"
+      },
+      "router": {}
+    },
+    "owner": "alorayz"
   }
 }
