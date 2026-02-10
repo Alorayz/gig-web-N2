@@ -29,6 +29,15 @@ export const confirmPayment = async (paymentIntentId: string) => {
   return response.data;
 };
 
+export const createCheckoutSession = async (userId: string, appName: string, termsAccepted: boolean) => {
+  const response = await api.post('/stripe/create-checkout-session', {
+    user_id: userId,
+    app_name: appName,
+    terms_accepted: termsAccepted,
+  });
+  return response.data;
+};
+
 // Zip Codes API
 export const getZipCodesByApp = async (appName: string) => {
   const response = await api.get(`/zip-codes/${appName}`);
