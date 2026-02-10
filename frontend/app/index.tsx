@@ -7,12 +7,12 @@ import {
   SafeAreaView,
   ScrollView,
   Dimensions,
-  Alert,
   Modal,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useLanguageStore } from '../src/stores/languageStore';
+import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
 import { seedData } from '../src/services/api';
 
@@ -26,9 +26,7 @@ export default function HomeScreen() {
   const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
-    // Reset app state when returning to home
     reset();
-    // Seed initial data
     initializeData();
   }, []);
 
@@ -59,20 +57,20 @@ export default function HomeScreen() {
           style={styles.languageButton}
           onPress={() => setShowLanguageModal(true)}
         >
-          <Ionicons name="language" size={20} color="#fff" />
+          <Ionicons name="language" size={20} color={COLORS.accent} />
           <Text style={styles.languageText}>
             {language === 'en' ? 'English' : 'Español'}
           </Text>
-          <Ionicons name="chevron-down" size={16} color="#fff" />
+          <Ionicons name="chevron-down" size={16} color={COLORS.accent} />
         </TouchableOpacity>
 
-        {/* Logo Area */}
+        {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Ionicons name="location" size={60} color="#4CAF50" />
-          </View>
-          <Text style={styles.title}>{t('app.title')}</Text>
-          <Text style={styles.subtitle}>{t('app.subtitle')}</Text>
+          <Image
+            source={require('../assets/images/logo.jpeg')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Description */}
@@ -84,19 +82,23 @@ export default function HomeScreen() {
         <View style={styles.featuresContainer}>
           <FeatureItem
             icon="car"
-            text={language === 'en' ? 'Spark Driver' : 'Spark Driver'}
+            text={t('select.spark')}
+            color="#FFC107"
           />
           <FeatureItem
             icon="fast-food"
-            text={language === 'en' ? 'DoorDash' : 'DoorDash'}
+            text={t('select.doordash')}
+            color="#FF5722"
           />
           <FeatureItem
             icon="cart"
-            text={language === 'en' ? 'Instacart' : 'Instacart'}
+            text={t('select.instacart')}
+            color="#4CAF50"
           />
           <FeatureItem
             icon="call"
             text={language === 'en' ? 'Free Google Voice Number' : 'Número Google Voice Gratis'}
+            color={COLORS.accent}
           />
         </View>
 
@@ -122,7 +124,7 @@ export default function HomeScreen() {
           style={styles.adminButton}
           onPress={handleAdminAccess}
         >
-          <Ionicons name="shield-checkmark" size={16} color="#888" />
+          <Ionicons name="shield-checkmark" size={16} color={COLORS.textMuted} />
           <Text style={styles.adminButtonText}>{t('app.adminAccess')}</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -150,7 +152,7 @@ export default function HomeScreen() {
               }}
             >
               <Text style={styles.languageOptionText}>🇺🇸 English</Text>
-              {language === 'en' && <Ionicons name="checkmark" size={20} color="#4CAF50" />}
+              {language === 'en' && <Ionicons name="checkmark" size={20} color={COLORS.accent} />}
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -161,7 +163,7 @@ export default function HomeScreen() {
               }}
             >
               <Text style={styles.languageOptionText}>🇪🇸 Español</Text>
-              {language === 'es' && <Ionicons name="checkmark" size={20} color="#4CAF50" />}
+              {language === 'es' && <Ionicons name="checkmark" size={20} color={COLORS.accent} />}
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -170,10 +172,10 @@ export default function HomeScreen() {
   );
 }
 
-const FeatureItem = ({ icon, text }: { icon: string; text: string }) => (
+const FeatureItem = ({ icon, text, color }: { icon: string; text: string; color: string }) => (
   <View style={styles.featureItem}>
-    <View style={styles.featureIconContainer}>
-      <Ionicons name={icon as any} size={24} color="#4CAF50" />
+    <View style={[styles.featureIconContainer, { backgroundColor: `${color}20` }]}>
+      <Ionicons name={icon as any} size={24} color={color} />
     </View>
     <Text style={styles.featureText}>{text}</Text>
   </View>
@@ -182,7 +184,7 @@ const FeatureItem = ({ icon, text }: { icon: string; text: string }) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -193,54 +195,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
   },
   languageText: {
-    color: '#fff',
+    color: COLORS.textPrimary,
     marginHorizontal: 8,
     fontSize: 14,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 30,
-  },
-  logoCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#aaa',
-    textAlign: 'center',
-    marginTop: 8,
+  logo: {
+    width: width * 0.7,
+    height: 180,
   },
   descriptionContainer: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 20,
     marginBottom: 30,
     width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
   },
   description: {
     fontSize: 16,
-    color: '#ddd',
+    color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -253,35 +240,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
   },
   featureIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
   featureText: {
     fontSize: 16,
-    color: '#fff',
+    color: COLORS.textPrimary,
     flex: 1,
   },
   mainButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.accent,
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 30,
     width: '100%',
     marginBottom: 12,
-    shadowColor: '#4CAF50',
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -295,7 +283,7 @@ const styles = StyleSheet.create({
   },
   priceInfo: {
     fontSize: 14,
-    color: '#888',
+    color: COLORS.textMuted,
     marginBottom: 30,
   },
   adminButton: {
@@ -305,27 +293,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   adminButtonText: {
-    color: '#888',
+    color: COLORS.textMuted,
     fontSize: 14,
     marginLeft: 8,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: COLORS.backgroundLight,
     borderRadius: 20,
     padding: 20,
     width: width * 0.8,
     maxWidth: 300,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -337,15 +327,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
   },
   selectedLanguage: {
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    backgroundColor: `${COLORS.accent}20`,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: COLORS.accent,
   },
   languageOptionText: {
     fontSize: 16,
-    color: '#fff',
+    color: COLORS.textPrimary,
   },
 });
