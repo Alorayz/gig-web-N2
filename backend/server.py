@@ -356,6 +356,46 @@ async def check_payment_by_email(email: str, app_name: str):
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@api_router.get("/stripe/check-payment-by-user/{user_id}")
+async def check_payment_by_user_id(user_id: str, app_name: str):
+    """Check if a payment exists for a user_id and app"""
+    try:
+        # First check our database for payments
+        payment = await db.payments.find_one({
+            "user_id": user_id,
+            "app_name": app_name.lower(),
+            "status": "succeeded"
+        })
+        
+        if payment:
+            return {
+                "found": True,
+                "status": "succeeded",
+                "payment_id": payment.get("id"),
+                "stripe_payment_intent_id": payment.get("stripe_payment_intent_id")
+            }
+        
+        # Also search Stripe sessions by metadata
+        sessions = stripe.checkout.Session.list(
+            limit=10,
+            expand=['data.payment_intent']
+        )
+        
+        for session in sessions.data:
+            if session.payment_status == 'paid':
+                metadata = session.metadata or {}
+                if (metadata.get('user_id') == user_id and 
+                    metadata.get('app_name', '').lower() == app_name.lower()):
+                    return {
+                        "found": True,
+                        "status": "succeeded",
+                        "session_id": session.id
+                    }
+        
+        return {"found": False, "status": "not_found"}
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # ============== ZIP CODES ROUTES ==============
 
 @api_router.get("/zip-codes/{app_name}")
