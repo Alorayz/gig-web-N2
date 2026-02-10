@@ -49,12 +49,19 @@ export default function SelectAppScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Logo */}
-        <Image
-          source={require('../assets/images/logo.jpeg')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        {/* New Professional Logo */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logoIconWrapper}>
+            <View style={styles.logoIcon}>
+              <Ionicons name="location" size={32} color={COLORS.accent} />
+              <View style={styles.logoArrow}>
+                <Ionicons name="arrow-up-circle" size={18} color={COLORS.accentLight} />
+              </View>
+            </View>
+          </View>
+          <Text style={styles.logoTitle}>GIG</Text>
+          <Text style={styles.logoSubtitle}>ZipFinder</Text>
+        </View>
         
         <View style={styles.header}>
           <Text style={styles.title}>{t('select.title')}</Text>
