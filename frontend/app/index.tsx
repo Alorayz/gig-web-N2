@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { seedData, getPaidApps, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
+import { seedData, getPaidApps, getZipCodesByApp, getGuidesByApp, verifyCheckoutSession } from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
