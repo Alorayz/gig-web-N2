@@ -8,14 +8,13 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Platform,
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp, createCheckoutSession } from '../src/services/api';
+import { createCheckoutSession, verifyCheckoutSession, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -34,8 +33,8 @@ export default function PaymentScreen() {
   const [isChecking, setIsChecking] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'loading' | 'ready' | 'processing' | 'success' | 'failed'>('idle');
-  const [currentPaymentIntentId, setCurrentPaymentIntentId] = useState<string | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -56,10 +55,10 @@ export default function PaymentScreen() {
     setIsLoading(true);
     
     try {
-      // Create payment intent on backend
-      const paymentData = await createPaymentIntent(userId, selectedApp, termsAccepted);
-      setCurrentPaymentIntentId(paymentData.payment_intent_id);
-      setClientSecret(paymentData.client_secret);
+      // Create Checkout Session directly
+      const checkoutData = await createCheckoutSession(userId, selectedApp, termsAccepted);
+      setCurrentSessionId(checkoutData.session_id);
+      setCheckoutUrl(checkoutData.checkout_url);
       setPaymentStatus('ready');
     } catch (error: any) {
       console.error('Payment initialization error:', error);
@@ -74,7 +73,7 @@ export default function PaymentScreen() {
   };
 
   const handlePayment = async () => {
-    if (!clientSecret || !currentPaymentIntentId || !selectedApp) {
+    if (!checkoutUrl || !currentSessionId) {
       Alert.alert(
         language === 'en' ? 'Please Wait' : 'Por Favor Espere',
         language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
@@ -85,25 +84,22 @@ export default function PaymentScreen() {
     setPaymentStatus('processing');
 
     try {
-      // Create a Stripe Checkout session and redirect
-      const checkoutData = await createCheckoutSession(userId, selectedApp, termsAccepted);
-      
-      if (checkoutData.checkout_url) {
-        // Open Stripe Checkout in browser
-        const canOpen = await Linking.canOpenURL(checkoutData.checkout_url);
-        if (canOpen) {
-          await Linking.openURL(checkoutData.checkout_url);
-          
-          // Show instructions to user
+      // Open Stripe Checkout in browser
+      const canOpen = await Linking.canOpenURL(checkoutUrl);
+      if (canOpen) {
+        await Linking.openURL(checkoutUrl);
+        
+        // Show instructions to user
+        setTimeout(() => {
           Alert.alert(
             language === 'en' ? 'Complete Payment' : 'Completar Pago',
             language === 'en' 
-              ? 'A secure payment page has opened. After completing the payment, return here and tap "Verify Payment".' 
-              : 'Se ha abierto una página de pago segura. Después de completar el pago, regrese aquí y toque "Verificar Pago".',
+              ? 'After completing the payment in Stripe, tap "I Already Paid" to unlock your content.' 
+              : 'Después de completar el pago en Stripe, toque "Ya Pagué" para desbloquear su contenido.',
             [
               { 
-                text: language === 'en' ? 'Verify Payment' : 'Verificar Pago', 
-                onPress: () => checkPaymentStatus() 
+                text: language === 'en' ? 'I Already Paid' : 'Ya Pagué', 
+                onPress: () => verifyPayment() 
               },
               { 
                 text: language === 'en' ? 'Cancel' : 'Cancelar', 
@@ -112,9 +108,9 @@ export default function PaymentScreen() {
               }
             ]
           );
-        } else {
-          throw new Error(language === 'en' ? 'Could not open payment page' : 'No se pudo abrir la página de pago');
-        }
+        }, 1000);
+      } else {
+        throw new Error(language === 'en' ? 'Could not open payment page' : 'No se pudo abrir la página de pago');
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
@@ -127,26 +123,34 @@ export default function PaymentScreen() {
     }
   };
 
-  const checkPaymentStatus = async () => {
-    if (!currentPaymentIntentId) return;
+  const verifyPayment = async () => {
+    if (!currentSessionId) return;
 
     setPaymentStatus('processing');
 
     try {
-      const result = await confirmPayment(currentPaymentIntentId);
+      // Verify the Checkout Session
+      const result = await verifyCheckoutSession(currentSessionId);
       
       if (result.status === 'succeeded') {
-        await verifyAndComplete();
+        await completePayment();
       } else {
         Alert.alert(
-          language === 'en' ? 'Payment Pending' : 'Pago Pendiente',
+          language === 'en' ? 'Payment Not Found' : 'Pago No Encontrado',
           language === 'en' 
-            ? 'Payment not yet completed. Please complete the payment and try again.' 
-            : 'El pago aún no se ha completado. Por favor complete el pago e intente de nuevo.',
+            ? 'We could not verify your payment. If you completed the payment, please wait a moment and try again.' 
+            : 'No pudimos verificar su pago. Si completó el pago, espere un momento e intente de nuevo.',
           [
             { 
-              text: language === 'en' ? 'Check Again' : 'Verificar de Nuevo', 
-              onPress: () => checkPaymentStatus() 
+              text: language === 'en' ? 'Try Again' : 'Intentar de Nuevo', 
+              onPress: () => verifyPayment() 
+            },
+            { 
+              text: language === 'en' ? 'Pay Again' : 'Pagar de Nuevo', 
+              onPress: () => {
+                setPaymentStatus('ready');
+                initializePayment(); // Create new session
+              }
             },
             { 
               text: language === 'en' ? 'Cancel' : 'Cancelar', 
@@ -157,20 +161,25 @@ export default function PaymentScreen() {
         );
       }
     } catch (error) {
+      console.error('Verification error:', error);
       setPaymentStatus('ready');
       Alert.alert(
         language === 'en' ? 'Error' : 'Error',
-        language === 'en' ? 'Could not verify payment status' : 'No se pudo verificar el estado del pago'
+        language === 'en' ? 'Could not verify payment. Please try again.' : 'No se pudo verificar el pago. Por favor intente de nuevo.',
+        [
+          { text: language === 'en' ? 'Try Again' : 'Intentar de Nuevo', onPress: () => verifyPayment() },
+          { text: language === 'en' ? 'Cancel' : 'Cancelar', style: 'cancel' }
+        ]
       );
     }
   };
 
-  const verifyAndComplete = async () => {
-    if (!currentPaymentIntentId) return;
+  const completePayment = async () => {
+    if (!currentSessionId) return;
 
     try {
       setPaymentStatus('success');
-      setPaymentIntentId(currentPaymentIntentId);
+      setPaymentIntentId(currentSessionId);
       setPaymentComplete(true);
       
       const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
@@ -346,15 +355,16 @@ export default function PaymentScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Verify Payment Button */}
-        {paymentStatus === 'ready' && currentPaymentIntentId && (
+        {/* Already Paid Button - Always visible when ready */}
+        {(paymentStatus === 'ready' || paymentStatus === 'processing') && currentSessionId && (
           <TouchableOpacity
             style={styles.verifyButton}
-            onPress={checkPaymentStatus}
+            onPress={verifyPayment}
+            disabled={paymentStatus === 'processing'}
           >
-            <Ionicons name="refresh" size={20} color={COLORS.accent} />
+            <Ionicons name="checkmark-done" size={20} color={COLORS.accent} />
             <Text style={styles.verifyButtonText}>
-              {language === 'en' ? 'Already Paid? Verify Payment' : '¿Ya Pagó? Verificar Pago'}
+              {language === 'en' ? 'I Already Paid - Verify Payment' : 'Ya Pagué - Verificar Pago'}
             </Text>
           </TouchableOpacity>
         )}
@@ -594,18 +604,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    paddingVertical: 12,
+    backgroundColor: `${COLORS.success}15`,
+    paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: COLORS.success,
     marginBottom: 20,
+    width: '100%',
   },
   verifyButtonText: {
-    color: COLORS.accent,
-    fontSize: 14,
-    fontWeight: '600',
+    color: COLORS.success,
+    fontSize: 16,
+    fontWeight: 'bold',
     marginLeft: 8,
   },
   supportedCards: {
