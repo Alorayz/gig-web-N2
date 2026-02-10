@@ -26,7 +26,7 @@ WHITE = colors.HexColor('#ffffff')
 LIGHT_GRAY = colors.HexColor('#f0f4f8')
 
 # Logo path
-LOGO_PATH = '/app/frontend/assets/images/logo.jpeg'
+LOGO_PATH = '/app/frontend/assets/images/logo_pdf.png'
 
 # App URLs
 APP_WEB_URL = "www.gigzipfinder.com"
