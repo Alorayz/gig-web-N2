@@ -158,6 +158,37 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Paid Apps Section - Show if user has paid apps */}
+        {paidApps.length > 0 && (
+          <View style={styles.paidAppsSection}>
+            <View style={styles.paidAppsHeader}>
+              <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+              <Text style={styles.paidAppsTitle}>
+                {language === 'en' ? 'Your Purchased Apps' : 'Tus Apps Compradas'}
+              </Text>
+            </View>
+            
+            {paidApps.map((app) => (
+              <TouchableOpacity
+                key={app}
+                style={[styles.paidAppItem, { borderColor: getAppColor(app) }]}
+                onPress={() => handleAccessPaidApp(app)}
+              >
+                <View style={[styles.paidAppIcon, { backgroundColor: `${getAppColor(app)}20` }]}>
+                  <Ionicons name={getAppIcon(app) as any} size={24} color={getAppColor(app)} />
+                </View>
+                <View style={styles.paidAppInfo}>
+                  <Text style={styles.paidAppName}>{getAppDisplayName(app)}</Text>
+                  <Text style={styles.paidAppStatus}>
+                    {language === 'en' ? 'Tap to access' : 'Toca para acceder'}
+                  </Text>
+                </View>
+                <Ionicons name="arrow-forward-circle" size={28} color={getAppColor(app)} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {/* Description */}
         <View style={styles.descriptionContainer}>
           <Text style={styles.description}>{t('app.description')}</Text>
