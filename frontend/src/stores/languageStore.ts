@@ -7,11 +7,39 @@ interface LanguageState {
   t: (key: string) => string;
 }
 
+// Brand colors from logo
+export const COLORS = {
+  // Primary colors
+  primaryDark: '#1a2a4a',      // Navy blue from logo
+  primaryLight: '#2a3a5a',    // Lighter navy
+  accent: '#00b4d8',          // Electric blue/cyan arrow
+  accentLight: '#48cae4',     // Light cyan
+  
+  // Metallic/Silver
+  silver: '#a8b2c1',
+  silverLight: '#d1d5db',
+  
+  // Background
+  background: '#0d1525',      // Dark background
+  backgroundLight: '#1a2a4a', // Card background
+  surface: '#243454',         // Surface color
+  
+  // Text
+  textPrimary: '#ffffff',
+  textSecondary: '#a8b2c1',
+  textMuted: '#6b7280',
+  
+  // Status
+  success: '#00b4d8',
+  error: '#ef4444',
+  warning: '#f59e0b',
+};
+
 const translations: Record<string, Record<string, string>> = {
   en: {
     // Home Screen
     'app.title': 'GIG ZipFinder',
-    'app.subtitle': 'Find Open Zip Codes for Gig Apps',
+    'app.subtitle': 'Find Your Next Opportunity',
     'app.description': 'Get access to zip codes with availability for Instacart, DoorDash, and Spark Driver plus step-by-step guides!',
     'app.getStarted': 'Get Started - $5.00',
     'app.selectLanguage': 'Select Language',
@@ -38,13 +66,17 @@ const translations: Record<string, Record<string, string>> = {
     'payment.title': 'Complete Payment',
     'payment.amount': '$5.00 USD',
     'payment.description': 'Payment for app opening guides and zip code suggestions',
-    'payment.processing': 'Processing...',
+    'payment.processing': 'Processing Payment...',
+    'payment.verifying': 'Verifying Payment...',
     'payment.pay': 'Pay $5.00',
     'payment.secure': 'Secure payment powered by Stripe',
     'payment.includes': 'Your purchase includes:',
-    'payment.item1': '5 zip codes with availability potential',
-    'payment.item2': 'Step-by-step account opening guide',
-    'payment.item3': 'Free Google Voice phone number guide',
+    'payment.item1': '5 zip codes with high availability potential',
+    'payment.item2': 'Comprehensive step-by-step account opening guide',
+    'payment.item3': 'Complete Google Voice free phone number guide',
+    'payment.success': 'Payment Successful!',
+    'payment.failed': 'Payment Failed',
+    'payment.tryAgain': 'Please try again',
     
     // Results Screen
     'results.title': 'Your Results',
@@ -55,6 +87,7 @@ const translations: Record<string, Record<string, string>> = {
     'results.noZipCodes': 'No zip codes available at this time',
     'results.tryAnother': 'Try Another App',
     'results.backHome': 'Back to Home',
+    'results.downloadPdf': 'Download PDF Guide',
     
     // Admin
     'admin.login': 'Admin Login',
@@ -88,7 +121,7 @@ const translations: Record<string, Record<string, string>> = {
   es: {
     // Home Screen
     'app.title': 'GIG ZipFinder',
-    'app.subtitle': 'Encuentra Códigos Postales Abiertos para Apps de Gig',
+    'app.subtitle': 'Encuentra Tu Próxima Oportunidad',
     'app.description': '¡Obtén acceso a códigos postales con disponibilidad para Instacart, DoorDash y Spark Driver más guías paso a paso!',
     'app.getStarted': 'Comenzar - $5.00',
     'app.selectLanguage': 'Seleccionar Idioma',
@@ -115,13 +148,17 @@ const translations: Record<string, Record<string, string>> = {
     'payment.title': 'Completar Pago',
     'payment.amount': '$5.00 USD',
     'payment.description': 'Pago por guías de apertura de apps y sugerencias de códigos postales',
-    'payment.processing': 'Procesando...',
+    'payment.processing': 'Procesando Pago...',
+    'payment.verifying': 'Verificando Pago...',
     'payment.pay': 'Pagar $5.00',
     'payment.secure': 'Pago seguro con Stripe',
     'payment.includes': 'Tu compra incluye:',
-    'payment.item1': '5 códigos postales con potencial de disponibilidad',
-    'payment.item2': 'Guía paso a paso para abrir cuenta',
-    'payment.item3': 'Guía gratuita de número Google Voice',
+    'payment.item1': '5 códigos postales con alto potencial de disponibilidad',
+    'payment.item2': 'Guía completa paso a paso para abrir cuenta',
+    'payment.item3': 'Guía completa de número gratuito Google Voice',
+    'payment.success': '¡Pago Exitoso!',
+    'payment.failed': 'Pago Fallido',
+    'payment.tryAgain': 'Por favor intente de nuevo',
     
     // Results Screen
     'results.title': 'Tus Resultados',
@@ -132,6 +169,7 @@ const translations: Record<string, Record<string, string>> = {
     'results.noZipCodes': 'No hay códigos postales disponibles en este momento',
     'results.tryAnother': 'Probar Otra App',
     'results.backHome': 'Volver al Inicio',
+    'results.downloadPdf': 'Descargar Guía PDF',
     
     // Admin
     'admin.login': 'Acceso Admin',
