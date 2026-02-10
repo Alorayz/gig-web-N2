@@ -28,6 +28,7 @@ export default function PaymentScreen() {
     setZipCodes,
     setGuides,
     setVoiceGuides,
+    addPaidApp,
   } = useAppStore();
   
   const [isChecking, setIsChecking] = useState(true);
