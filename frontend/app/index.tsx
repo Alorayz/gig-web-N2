@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Dimensions,
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
