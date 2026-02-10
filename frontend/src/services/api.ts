@@ -34,6 +34,11 @@ export const verifyCheckoutSession = async (sessionId: string) => {
   return response.data;
 };
 
+export const getPaidApps = async (userId: string) => {
+  const response = await api.get(`/stripe/paid-apps/${userId}`);
+  return response.data;
+};
+
 export const createCheckoutSession = async (userId: string, appName: string, termsAccepted: boolean) => {
   const response = await api.post('/stripe/create-checkout-session', {
     user_id: userId,
