@@ -29,6 +29,8 @@ export default function PaymentScreen() {
     setGuides,
     setVoiceGuides,
     addPaidApp,
+    lastSessionId,
+    setLastSessionId,
   } = useAppStore();
   
   const [isChecking, setIsChecking] = useState(true);
