@@ -57,6 +57,47 @@ app = FastAPI(title="Gig ZipFinder API")
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Marketing files directory
+MARKETING_DIR = Path("/app/frontend/public/marketing")
+
+@api_router.get("/download/marketing-pack")
+async def download_marketing_pack():
+    """Download all marketing materials as ZIP"""
+    zip_path = Path("/app/frontend/public/marketing_pack.zip")
+    if zip_path.exists():
+        return FileResponse(
+            path=str(zip_path),
+            filename="GIG_ZipFinder_Marketing_Pack.zip",
+            media_type="application/zip"
+        )
+    raise HTTPException(status_code=404, detail="Marketing pack not found")
+
+@api_router.get("/download/marketing/{category}/{filename}")
+async def download_marketing_file(category: str, filename: str):
+    """Download individual marketing file"""
+    file_path = MARKETING_DIR / category / filename
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(
+            path=str(file_path),
+            filename=filename,
+            media_type="image/png" if filename.endswith('.png') else "application/octet-stream"
+        )
+    raise HTTPException(status_code=404, detail="File not found")
+
+@api_router.get("/marketing/list")
+async def list_marketing_files():
+    """List all available marketing files"""
+    files = {
+        "playstore": [],
+        "instagram": [],
+        "tiktok": []
+    }
+    for category in files.keys():
+        category_path = MARKETING_DIR / category
+        if category_path.exists():
+            files[category] = [f.name for f in category_path.iterdir() if f.is_file()]
+    return files
+
 # ============== MODELS ==============
 
 class ZipCode(BaseModel):
