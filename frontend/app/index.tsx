@@ -8,25 +8,38 @@ import {
   ScrollView,
   Modal,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { seedData } from '../src/services/api';
+import { seedData, getPaidApps, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguageStore();
-  const { reset } = useAppStore();
+  const { 
+    resetForNewPurchase, 
+    userId, 
+    paidApps, 
+    setPaidApps,
+    setSelectedApp,
+    setPaymentComplete,
+    setZipCodes,
+    setGuides,
+    setVoiceGuides,
+  } = useAppStore();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isLoadingPaidApps, setIsLoadingPaidApps] = useState(true);
 
   useEffect(() => {
-    reset();
+    resetForNewPurchase();
     initializeData();
+    loadPaidApps();
   }, []);
 
   const initializeData = async () => {
@@ -40,12 +53,75 @@ export default function HomeScreen() {
     }
   };
 
+  const loadPaidApps = async () => {
+    try {
+      setIsLoadingPaidApps(true);
+      const result = await getPaidApps(userId);
+      if (result.paid_apps && result.paid_apps.length > 0) {
+        setPaidApps(result.paid_apps);
+      }
+    } catch (error) {
+      console.log('Error loading paid apps:', error);
+    } finally {
+      setIsLoadingPaidApps(false);
+    }
+  };
+
   const handleGetStarted = () => {
     router.push('/select-app');
   };
 
+  const handleAccessPaidApp = async (appName: string) => {
+    try {
+      setSelectedApp(appName);
+      setPaymentComplete(true);
+      
+      // Load content for the paid app
+      const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
+        getZipCodesByApp(appName),
+        getGuidesByApp(appName),
+        getGuidesByApp('google_voice'),
+      ]);
+
+      setZipCodes(zipCodesData);
+      setGuides(guidesData);
+      setVoiceGuides(voiceGuidesData);
+
+      router.push('/results');
+    } catch (error) {
+      console.error('Error loading paid app content:', error);
+    }
+  };
+
   const handleAdminAccess = () => {
     router.push('/admin/login');
+  };
+
+  const getAppDisplayName = (app: string) => {
+    switch (app.toLowerCase()) {
+      case 'spark': return 'Spark Driver';
+      case 'doordash': return 'DoorDash';
+      case 'instacart': return 'Instacart';
+      default: return app;
+    }
+  };
+
+  const getAppIcon = (app: string) => {
+    switch (app.toLowerCase()) {
+      case 'spark': return 'car';
+      case 'doordash': return 'fast-food';
+      case 'instacart': return 'cart';
+      default: return 'apps';
+    }
+  };
+
+  const getAppColor = (app: string) => {
+    switch (app.toLowerCase()) {
+      case 'spark': return '#FFC107';
+      case 'doordash': return '#FF5722';
+      case 'instacart': return '#4CAF50';
+      default: return COLORS.accent;
+    }
   };
 
   return (
