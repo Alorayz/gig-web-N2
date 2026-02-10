@@ -220,10 +220,55 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: 20,
+    padding: 20,
   },
-  logo: {
-    width: width * 0.7,
-    height: 180,
+  logoIconWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: `${COLORS.accent}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+  },
+  logoIcon: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoArrow: {
+    position: 'absolute',
+    bottom: -5,
+    right: -10,
+  },
+  logoTitle: {
+    fontSize: 42,
+    fontWeight: 'bold',
+    color: COLORS.accent,
+    letterSpacing: 4,
+  },
+  logoSubtitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    letterSpacing: 2,
+    marginTop: -5,
+  },
+  logoBadge: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+  },
+  logoBadgeText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
   },
   descriptionContainer: {
     backgroundColor: COLORS.surface,
