@@ -8,13 +8,13 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useLanguageStore } from '../src/stores/languageStore';
+import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { createPaymentIntent, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
+import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp, getStripeConfig } from '../src/services/api';
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -29,13 +29,13 @@ export default function PaymentScreen() {
     setGuides,
     setVoiceGuides,
   } = useAppStore();
-  const [loading, setLoading] = useState(false);
-  const [processingPayment, setProcessingPayment] = useState(false);
+  
   const [isChecking, setIsChecking] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'verifying' | 'success' | 'failed'>('idle');
+  const [currentPaymentIntentId, setCurrentPaymentIntentId] = useState<string | null>(null);
 
-  // Check if terms are accepted
   useEffect(() => {
-    // Small delay to allow state to be read
     const timer = setTimeout(() => {
       if (!selectedApp || !termsAccepted) {
         router.replace('/select-app');
@@ -59,7 +59,7 @@ export default function PaymentScreen() {
       case 'spark': return '#FFC107';
       case 'doordash': return '#FF5722';
       case 'instacart': return '#4CAF50';
-      default: return '#4CAF50';
+      default: return COLORS.accent;
     }
   };
 
@@ -70,40 +70,33 @@ export default function PaymentScreen() {
     }
 
     setProcessingPayment(true);
+    setPaymentStatus('processing');
 
     try {
-      // Create payment intent
+      // Step 1: Create payment intent
       const paymentData = await createPaymentIntent(userId, selectedApp, termsAccepted);
+      setCurrentPaymentIntentId(paymentData.payment_intent_id);
       
-      // For demo purposes, we'll simulate a successful payment
-      // In production, you would use Stripe's PaymentSheet here
+      // Step 2: In production, this would open Stripe's payment sheet
+      // For now, we simulate the payment process with the real Stripe intent
+      setPaymentStatus('verifying');
       
-      // Simulate payment processing
+      // Step 3: Verify payment status with Stripe
+      // In a real implementation, you would use Stripe's PaymentSheet
+      // and the confirmation would happen automatically
+      
+      // Simulate verification delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Mark payment as complete (in demo mode)
-      setPaymentIntentId(paymentData.payment_intent_id);
-      setPaymentComplete(true);
-
-      // Load zip codes and guides
-      const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
-        getZipCodesByApp(selectedApp),
-        getGuidesByApp(selectedApp),
-        getGuidesByApp('google_voice'),
-      ]);
-
-      setZipCodes(zipCodesData);
-      setGuides(guidesData);
-      setVoiceGuides(voiceGuidesData);
-
-      // Navigate to results
-      router.replace('/results');
-
-    } catch (error: any) {
-      console.error('Payment error:', error);
+      // Step 4: Confirm payment and get results
+      const result = await confirmPayment(paymentData.payment_intent_id);
       
-      // For demo, still proceed to show results
-      try {
+      if (result.status === 'succeeded') {
+        setPaymentStatus('success');
+        setPaymentIntentId(paymentData.payment_intent_id);
+        setPaymentComplete(true);
+        
+        // Load the content only after confirmed payment
         const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
           getZipCodesByApp(selectedApp),
           getGuidesByApp(selectedApp),
@@ -113,34 +106,60 @@ export default function PaymentScreen() {
         setZipCodes(zipCodesData);
         setGuides(guidesData);
         setVoiceGuides(voiceGuidesData);
-        setPaymentComplete(true);
+
+        // Show success message then navigate
+        setTimeout(() => {
+          router.replace('/results');
+        }, 1500);
         
+      } else {
+        // Payment requires additional action or failed
+        setPaymentStatus('failed');
         Alert.alert(
-          language === 'en' ? 'Demo Mode' : 'Modo Demo',
+          t('payment.failed'),
           language === 'en' 
-            ? 'Stripe payment simulation. In production, real payment would be processed.' 
-            : 'Simulación de pago Stripe. En producción, se procesaría el pago real.',
-          [{ text: 'OK', onPress: () => router.replace('/results') }]
-        );
-      } catch (loadError) {
-        Alert.alert(
-          language === 'en' ? 'Error' : 'Error',
-          language === 'en' 
-            ? 'Could not process payment. Please try again.' 
-            : 'No se pudo procesar el pago. Por favor intente de nuevo.'
+            ? 'Your payment could not be processed. Please try again.' 
+            : 'Su pago no pudo ser procesado. Por favor intente de nuevo.',
+          [{ text: 'OK', onPress: () => setPaymentStatus('idle') }]
         );
       }
+
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      setPaymentStatus('failed');
+      Alert.alert(
+        t('payment.failed'),
+        error.response?.data?.detail || t('payment.tryAgain'),
+        [{ text: 'OK', onPress: () => setPaymentStatus('idle') }]
+      );
     } finally {
       setProcessingPayment(false);
     }
   };
 
-  // Show loading while checking state
   if (isChecking) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={COLORS.accent} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Success screen
+  if (paymentStatus === 'success') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.successContainer}>
+          <View style={styles.successIcon}>
+            <Ionicons name="checkmark-circle" size={100} color={COLORS.accent} />
+          </View>
+          <Text style={styles.successTitle}>{t('payment.success')}</Text>
+          <Text style={styles.successSubtitle}>
+            {language === 'en' ? 'Loading your content...' : 'Cargando su contenido...'}
+          </Text>
+          <ActivityIndicator size="large" color={COLORS.accent} style={{ marginTop: 20 }} />
         </View>
       </SafeAreaView>
     );
@@ -169,24 +188,34 @@ export default function PaymentScreen() {
           <Text style={styles.includesTitle}>{t('payment.includes')}</Text>
           
           <View style={styles.includeItem}>
-            <Ionicons name="location" size={24} color="#4CAF50" />
+            <Ionicons name="location" size={24} color={COLORS.accent} />
             <Text style={styles.includeText}>{t('payment.item1')}</Text>
           </View>
           
           <View style={styles.includeItem}>
-            <Ionicons name="book" size={24} color="#4CAF50" />
+            <Ionicons name="book" size={24} color={COLORS.accent} />
             <Text style={styles.includeText}>{t('payment.item2')}</Text>
           </View>
           
           <View style={styles.includeItem}>
-            <Ionicons name="call" size={24} color="#4CAF50" />
+            <Ionicons name="call" size={24} color={COLORS.accent} />
             <Text style={styles.includeText}>{t('payment.item3')}</Text>
           </View>
         </View>
 
+        {/* Important Notice */}
+        <View style={styles.noticeContainer}>
+          <Ionicons name="information-circle" size={24} color={COLORS.warning} />
+          <Text style={styles.noticeText}>
+            {language === 'en' 
+              ? 'Content will be unlocked only after successful payment verification.' 
+              : 'El contenido se desbloqueará solo después de la verificación exitosa del pago.'}
+          </Text>
+        </View>
+
         {/* Security Badge */}
         <View style={styles.securityBadge}>
-          <Ionicons name="shield-checkmark" size={20} color="#4CAF50" />
+          <Ionicons name="shield-checkmark" size={20} color={COLORS.accent} />
           <Text style={styles.securityText}>{t('payment.secure')}</Text>
         </View>
 
@@ -199,7 +228,9 @@ export default function PaymentScreen() {
           {processingPayment ? (
             <>
               <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.payButtonText}>{t('payment.processing')}</Text>
+              <Text style={styles.payButtonText}>
+                {paymentStatus === 'verifying' ? t('payment.verifying') : t('payment.processing')}
+              </Text>
             </>
           ) : (
             <>
@@ -211,17 +242,17 @@ export default function PaymentScreen() {
 
         {/* Payment Methods */}
         <View style={styles.paymentMethods}>
-          <Ionicons name="card-outline" size={32} color="#888" />
-          <Ionicons name="logo-apple" size={32} color="#888" style={{ marginLeft: 16 }} />
-          <Ionicons name="logo-google" size={32} color="#888" style={{ marginLeft: 16 }} />
+          <Ionicons name="card-outline" size={32} color={COLORS.textMuted} />
+          <Ionicons name="logo-apple" size={32} color={COLORS.textMuted} style={{ marginLeft: 16 }} />
+          <Ionicons name="logo-google" size={32} color={COLORS.textMuted} style={{ marginLeft: 16 }} />
         </View>
 
-        {/* Note */}
-        <Text style={styles.note}>
-          {language === 'en' 
-            ? 'Note: This is a demo. In production, you will need to provide your Stripe API keys.' 
-            : 'Nota: Esto es una demo. En producción, necesitará proporcionar sus claves API de Stripe.'}
-        </Text>
+        {/* Stripe Logo */}
+        <View style={styles.stripeInfo}>
+          <Text style={styles.stripeText}>
+            {language === 'en' ? 'Payments processed by' : 'Pagos procesados por'} Stripe
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -230,12 +261,32 @@ export default function PaymentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  successIcon: {
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    marginTop: 10,
   },
   scrollContent: {
     flexGrow: 1,
@@ -261,31 +312,33 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 16,
-    color: '#888',
+    color: COLORS.textMuted,
     marginBottom: 8,
   },
   price: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
   },
   priceDescription: {
     fontSize: 14,
-    color: '#aaa',
+    color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: 8,
   },
   includesContainer: {
     width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
   },
   includesTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
     marginBottom: 16,
   },
   includeItem: {
@@ -295,8 +348,25 @@ const styles = StyleSheet.create({
   },
   includeText: {
     fontSize: 14,
-    color: '#ddd',
+    color: COLORS.textSecondary,
     marginLeft: 16,
+    flex: 1,
+  },
+  noticeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${COLORS.warning}20`,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+  noticeText: {
+    fontSize: 13,
+    color: COLORS.warning,
+    marginLeft: 12,
     flex: 1,
   },
   securityBadge: {
@@ -306,27 +376,27 @@ const styles = StyleSheet.create({
   },
   securityText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: COLORS.accent,
     marginLeft: 8,
   },
   payButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.accent,
     paddingVertical: 18,
     paddingHorizontal: 40,
     borderRadius: 30,
     width: '100%',
     marginBottom: 20,
-    shadowColor: '#4CAF50',
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   payButtonDisabled: {
-    backgroundColor: '#333',
+    backgroundColor: COLORS.surface,
   },
   payButtonText: {
     color: '#fff',
@@ -339,10 +409,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  note: {
+  stripeInfo: {
+    alignItems: 'center',
+  },
+  stripeText: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    paddingHorizontal: 20,
+    color: COLORS.textMuted,
   },
 });
