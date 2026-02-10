@@ -128,11 +128,43 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 20,
   },
-  logo: {
-    width: 120,
-    height: 60,
-    alignSelf: 'center',
+  logoContainer: {
+    alignItems: 'center',
     marginBottom: 10,
+  },
+  logoIconWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: `${COLORS.accent}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+  },
+  logoIcon: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoArrow: {
+    position: 'absolute',
+    bottom: -3,
+    right: -8,
+  },
+  logoTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.accent,
+    letterSpacing: 3,
+  },
+  logoSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    letterSpacing: 1,
+    marginTop: -2,
   },
   header: {
     marginBottom: 30,
