@@ -17,20 +17,6 @@ import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
 import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp, createCheckoutSession } from '../src/services/api';
 
-// For native platforms, we'll use Stripe's PaymentSheet
-let useStripe: any = null;
-let usePaymentSheet: any = null;
-
-if (Platform.OS !== 'web') {
-  try {
-    const stripeNative = require('@stripe/stripe-react-native');
-    useStripe = stripeNative.useStripe;
-    usePaymentSheet = stripeNative.usePaymentSheet;
-  } catch (e) {
-    console.log('Stripe native not available');
-  }
-}
-
 export default function PaymentScreen() {
   const router = useRouter();
   const { language, t } = useLanguageStore();
@@ -50,11 +36,6 @@ export default function PaymentScreen() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'loading' | 'ready' | 'processing' | 'success' | 'failed'>('idle');
   const [currentPaymentIntentId, setCurrentPaymentIntentId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentSheetReady, setPaymentSheetReady] = useState(false);
-
-  // Native Stripe hooks
-  const stripeHook = Platform.OS !== 'web' && useStripe ? useStripe() : null;
-  const paymentSheetHook = Platform.OS !== 'web' && usePaymentSheet ? usePaymentSheet() : null;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -79,25 +60,6 @@ export default function PaymentScreen() {
       const paymentData = await createPaymentIntent(userId, selectedApp, termsAccepted);
       setCurrentPaymentIntentId(paymentData.payment_intent_id);
       setClientSecret(paymentData.client_secret);
-
-      // For native apps, initialize PaymentSheet
-      if (Platform.OS !== 'web' && paymentSheetHook?.initPaymentSheet) {
-        const { error } = await paymentSheetHook.initPaymentSheet({
-          paymentIntentClientSecret: paymentData.client_secret,
-          merchantDisplayName: 'GIG ZipFinder',
-          style: 'automatic',
-          allowsDelayedPaymentMethods: false,
-        });
-
-        if (error) {
-          console.error('PaymentSheet init error:', error);
-          setPaymentStatus('failed');
-          Alert.alert('Error', error.message);
-          return;
-        }
-        setPaymentSheetReady(true);
-      }
-      
       setPaymentStatus('ready');
     } catch (error: any) {
       console.error('Payment initialization error:', error);
@@ -111,40 +73,8 @@ export default function PaymentScreen() {
     }
   };
 
-  const handleNativePayment = async () => {
-    if (!paymentSheetHook?.presentPaymentSheet || !currentPaymentIntentId) {
-      Alert.alert('Error', 'Payment not ready');
-      return;
-    }
-
-    setPaymentStatus('processing');
-
-    try {
-      const { error } = await paymentSheetHook.presentPaymentSheet();
-
-      if (error) {
-        if (error.code === 'Canceled') {
-          setPaymentStatus('ready');
-          return;
-        }
-        throw error;
-      }
-
-      // Payment successful
-      await verifyAndComplete();
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      setPaymentStatus('failed');
-      Alert.alert(
-        t('payment.failed'),
-        error.message || t('payment.tryAgain'),
-        [{ text: 'OK', onPress: () => setPaymentStatus('ready') }]
-      );
-    }
-  };
-
-  const handleWebPayment = async () => {
-    if (!clientSecret || !currentPaymentIntentId) {
+  const handlePayment = async () => {
+    if (!clientSecret || !currentPaymentIntentId || !selectedApp) {
       Alert.alert(
         language === 'en' ? 'Please Wait' : 'Por Favor Espere',
         language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
@@ -155,8 +85,8 @@ export default function PaymentScreen() {
     setPaymentStatus('processing');
 
     try {
-      // Create a Stripe Checkout session for web
-      const checkoutData = await createCheckoutSession(userId, selectedApp!, termsAccepted);
+      // Create a Stripe Checkout session and redirect
+      const checkoutData = await createCheckoutSession(userId, selectedApp, termsAccepted);
       
       if (checkoutData.checkout_url) {
         // Open Stripe Checkout in browser
@@ -168,8 +98,8 @@ export default function PaymentScreen() {
           Alert.alert(
             language === 'en' ? 'Complete Payment' : 'Completar Pago',
             language === 'en' 
-              ? 'A payment page has opened in your browser. After completing the payment, return here and tap "Verify Payment".' 
-              : 'Se ha abierto una página de pago en su navegador. Después de completar el pago, regrese aquí y toque "Verificar Pago".',
+              ? 'A secure payment page has opened. After completing the payment, return here and tap "Verify Payment".' 
+              : 'Se ha abierto una página de pago segura. Después de completar el pago, regrese aquí y toque "Verificar Pago".',
             [
               { 
                 text: language === 'en' ? 'Verify Payment' : 'Verificar Pago', 
@@ -182,6 +112,8 @@ export default function PaymentScreen() {
               }
             ]
           );
+        } else {
+          throw new Error(language === 'en' ? 'Could not open payment page' : 'No se pudo abrir la página de pago');
         }
       }
     } catch (error: any) {
@@ -209,8 +141,8 @@ export default function PaymentScreen() {
         Alert.alert(
           language === 'en' ? 'Payment Pending' : 'Pago Pendiente',
           language === 'en' 
-            ? 'Payment not yet completed. Please complete the payment in your browser and try again.' 
-            : 'El pago aún no se ha completado. Por favor complete el pago en su navegador e intente de nuevo.',
+            ? 'Payment not yet completed. Please complete the payment and try again.' 
+            : 'El pago aún no se ha completado. Por favor complete el pago e intente de nuevo.',
           [
             { 
               text: language === 'en' ? 'Check Again' : 'Verificar de Nuevo', 
@@ -259,14 +191,6 @@ export default function PaymentScreen() {
       setTimeout(() => {
         router.replace('/results');
       }, 2500);
-    }
-  };
-
-  const handlePayment = () => {
-    if (Platform.OS !== 'web' && paymentSheetReady) {
-      handleNativePayment();
-    } else {
-      handleWebPayment();
     }
   };
 
@@ -366,14 +290,9 @@ export default function PaymentScreen() {
           <View style={styles.readyNotice}>
             <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
             <Text style={styles.readyNoticeText}>
-              {Platform.OS !== 'web' 
-                ? (language === 'en' 
-                    ? 'Ready! Tap below to open secure payment form' 
-                    : 'Listo! Toque abajo para abrir formulario de pago seguro')
-                : (language === 'en'
-                    ? 'Ready! Tap to pay via Stripe Checkout'
-                    : 'Listo! Toque para pagar via Stripe Checkout')
-              }
+              {language === 'en' 
+                ? 'Ready! Tap below to open secure Stripe payment page' 
+                : '¡Listo! Toque abajo para abrir la página de pago seguro de Stripe'}
             </Text>
           </View>
         )}
@@ -427,8 +346,8 @@ export default function PaymentScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Verify Payment Button (for web after redirect) */}
-        {Platform.OS === 'web' && paymentStatus === 'ready' && currentPaymentIntentId && (
+        {/* Verify Payment Button */}
+        {paymentStatus === 'ready' && currentPaymentIntentId && (
           <TouchableOpacity
             style={styles.verifyButton}
             onPress={checkPaymentStatus}
@@ -465,7 +384,7 @@ export default function PaymentScreen() {
         <View style={styles.stripeInfo}>
           <Ionicons name="lock-closed" size={14} color={COLORS.textMuted} />
           <Text style={styles.stripeText}>
-            {language === 'en' ? 'Powered by' : 'Procesado por'} 
+            {language === 'en' ? 'Secure payments by' : 'Pagos seguros por'} 
           </Text>
           <Text style={styles.stripeBrand}>Stripe</Text>
         </View>
@@ -474,8 +393,8 @@ export default function PaymentScreen() {
         <View style={styles.securityNotice}>
           <Text style={styles.securityNoticeText}>
             {language === 'en' 
-              ? 'Your card details are handled securely by Stripe. We never store your card information.' 
-              : 'Los datos de su tarjeta son manejados de forma segura por Stripe. Nunca almacenamos su información de tarjeta.'}
+              ? 'Your payment is processed securely by Stripe. We never see or store your card information.' 
+              : 'Su pago es procesado de forma segura por Stripe. Nunca vemos ni guardamos la información de su tarjeta.'}
           </Text>
         </View>
 
