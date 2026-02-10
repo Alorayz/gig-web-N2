@@ -62,6 +62,7 @@ export default function PaymentScreen() {
       const checkoutData = await createCheckoutSession(userId, selectedApp, termsAccepted);
       setCurrentSessionId(checkoutData.session_id);
       setCheckoutUrl(checkoutData.checkout_url);
+      setLastSessionId(checkoutData.session_id); // Save for later verification
       setPaymentStatus('ready');
     } catch (error: any) {
       console.error('Payment initialization error:', error);
