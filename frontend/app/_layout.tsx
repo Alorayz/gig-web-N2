@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useLanguageStore } from '../src/stores/languageStore';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 
 export default function RootLayout() {
   const { isLoading } = useLanguageStore();
@@ -10,7 +10,7 @@ export default function RootLayout() {
   if (isLoading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={COLORS.accent} />
       </View>
     );
   }
@@ -21,14 +21,14 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#1a1a2e',
+            backgroundColor: COLORS.backgroundLight,
           },
-          headerTintColor: '#fff',
+          headerTintColor: COLORS.textPrimary,
           headerTitleStyle: {
             fontWeight: 'bold',
           },
           contentStyle: {
-            backgroundColor: '#0f0f1a',
+            backgroundColor: COLORS.background,
           },
         }}
       >
@@ -70,6 +70,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0f0f1a',
+    backgroundColor: COLORS.background,
   },
 });
