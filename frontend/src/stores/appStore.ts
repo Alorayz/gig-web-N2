@@ -11,7 +11,8 @@ interface AppState {
   guides: any[];
   voiceGuides: any[];
   userId: string;
-  paidApps: string[]; // Apps the user has paid for
+  paidApps: string[];
+  lastSessionId: string | null;
   
   setSelectedApp: (app: string | null) => void;
   setTermsAccepted: (accepted: boolean) => void;
@@ -23,13 +24,19 @@ interface AppState {
   setPaidApps: (apps: string[]) => void;
   addPaidApp: (app: string) => void;
   isAppPaid: (app: string) => boolean;
+  setLastSessionId: (id: string | null) => void;
   reset: () => void;
   resetForNewPurchase: () => void;
 }
 
-// Generate a unique user ID for tracking
+// Generate a unique user ID
 const generateUserId = () => {
   return 'user_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+};
+
+// Get or create user ID
+const getOrCreateUserId = () => {
+  return generateUserId();
 };
 
 export const useAppStore = create<AppState>()(
@@ -42,8 +49,9 @@ export const useAppStore = create<AppState>()(
       zipCodes: [],
       guides: [],
       voiceGuides: [],
-      userId: generateUserId(),
+      userId: getOrCreateUserId(),
       paidApps: [],
+      lastSessionId: null,
       
       setSelectedApp: (app) => set({ selectedApp: app }),
       setTermsAccepted: (accepted) => set({ termsAccepted: accepted }),
@@ -52,16 +60,25 @@ export const useAppStore = create<AppState>()(
       setZipCodes: (codes) => set({ zipCodes: codes }),
       setGuides: (guides) => set({ guides: guides }),
       setVoiceGuides: (guides) => set({ voiceGuides: guides }),
-      setPaidApps: (apps) => set({ paidApps: apps }),
+      setPaidApps: (apps) => {
+        console.log('Setting paid apps:', apps);
+        set({ paidApps: apps });
+      },
       addPaidApp: (app) => {
         const currentPaidApps = get().paidApps;
-        if (!currentPaidApps.includes(app.toLowerCase())) {
-          set({ paidApps: [...currentPaidApps, app.toLowerCase()] });
+        const appLower = app.toLowerCase();
+        if (!currentPaidApps.includes(appLower)) {
+          const newPaidApps = [...currentPaidApps, appLower];
+          console.log('Adding paid app:', appLower, 'New list:', newPaidApps);
+          set({ paidApps: newPaidApps });
         }
       },
       isAppPaid: (app) => {
-        return get().paidApps.includes(app.toLowerCase());
+        const isPaid = get().paidApps.includes(app.toLowerCase());
+        console.log('Checking if app is paid:', app, isPaid);
+        return isPaid;
       },
+      setLastSessionId: (id) => set({ lastSessionId: id }),
       reset: () => set({ 
         selectedApp: null, 
         termsAccepted: false, 
@@ -70,7 +87,7 @@ export const useAppStore = create<AppState>()(
         zipCodes: [],
         guides: [],
         voiceGuides: [],
-        // Keep userId and paidApps on reset
+        lastSessionId: null,
       }),
       resetForNewPurchase: () => set({
         selectedApp: null,
@@ -80,15 +97,21 @@ export const useAppStore = create<AppState>()(
         zipCodes: [],
         guides: [],
         voiceGuides: [],
+        lastSessionId: null,
       }),
     }),
     {
       name: 'gig-zipfinder-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      // Persist these fields
       partialize: (state) => ({
         userId: state.userId,
         paidApps: state.paidApps,
+        lastSessionId: state.lastSessionId,
       }),
+      onRehydrateStorage: () => (state) => {
+        console.log('Storage rehydrated:', state?.paidApps);
+      },
     }
   )
 );
