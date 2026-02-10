@@ -6,14 +6,12 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Dimensions,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useLanguageStore } from '../src/stores/languageStore';
+import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-
-const { width } = Dimensions.get('window');
 
 const apps = [
   {
@@ -41,7 +39,7 @@ const apps = [
 
 export default function SelectAppScreen() {
   const router = useRouter();
-  const { t } = useLanguageStore();
+  const { language, t } = useLanguageStore();
   const { setSelectedApp } = useAppStore();
 
   const handleSelectApp = (appId: string) => {
@@ -52,6 +50,13 @@ export default function SelectAppScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Logo */}
+        <Image
+          source={require('../assets/images/logo.jpeg')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        
         <View style={styles.header}>
           <Text style={styles.title}>{t('select.title')}</Text>
           <Text style={styles.subtitle}>{t('select.subtitle')}</Text>
@@ -74,14 +79,14 @@ export default function SelectAppScreen() {
               </View>
               <View style={styles.priceContainer}>
                 <Text style={styles.price}>$5.00</Text>
-                <Ionicons name="chevron-forward" size={24} color="#888" />
+                <Ionicons name="chevron-forward" size={24} color={COLORS.accent} />
               </View>
             </TouchableOpacity>
           ))}
         </View>
 
         <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={24} color="#4CAF50" />
+          <Ionicons name="information-circle" size={24} color={COLORS.accent} />
           <Text style={styles.infoText}>
             {t('select.perApp')}
           </Text>
@@ -89,11 +94,12 @@ export default function SelectAppScreen() {
 
         <View style={styles.includesContainer}>
           <Text style={styles.includesTitle}>
-            {useLanguageStore.getState().language === 'en' ? 'Each purchase includes:' : 'Cada compra incluye:'}
+            {language === 'en' ? 'Each purchase includes:' : 'Cada compra incluye:'}
           </Text>
-          <IncludeItem text={useLanguageStore.getState().language === 'en' ? '5 zip codes with availability' : '5 códigos postales con disponibilidad'} />
-          <IncludeItem text={useLanguageStore.getState().language === 'en' ? 'Step-by-step opening guide' : 'Guía de apertura paso a paso'} />
-          <IncludeItem text={useLanguageStore.getState().language === 'en' ? 'Google Voice free number guide' : 'Guía de número gratis Google Voice'} />
+          <IncludeItem text={language === 'en' ? '5 zip codes with high availability' : '5 códigos postales con alta disponibilidad'} />
+          <IncludeItem text={language === 'en' ? 'Detailed step-by-step opening guide' : 'Guía detallada paso a paso de apertura'} />
+          <IncludeItem text={language === 'en' ? 'Google Voice free number guide' : 'Guía de número gratis Google Voice'} />
+          <IncludeItem text={language === 'en' ? 'PDF downloadable guides' : 'Guías descargables en PDF'} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -102,7 +108,7 @@ export default function SelectAppScreen() {
 
 const IncludeItem = ({ text }: { text: string }) => (
   <View style={styles.includeItem}>
-    <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+    <Ionicons name="checkmark-circle" size={20} color={COLORS.accent} />
     <Text style={styles.includeText}>{text}</Text>
   </View>
 );
@@ -110,11 +116,17 @@ const IncludeItem = ({ text }: { text: string }) => (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     flexGrow: 1,
     padding: 20,
+  },
+  logo: {
+    width: 120,
+    height: 60,
+    alignSelf: 'center',
+    marginBottom: 10,
   },
   header: {
     marginBottom: 30,
@@ -122,12 +134,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#aaa',
+    color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: 8,
   },
@@ -137,12 +149,12 @@ const styles = StyleSheet.create({
   appCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.primaryLight,
   },
   iconContainer: {
     width: 70,
@@ -158,11 +170,11 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
   },
   appDesc: {
     fontSize: 14,
-    color: '#aaa',
+    color: COLORS.textSecondary,
     marginTop: 4,
   },
   priceContainer: {
@@ -172,33 +184,37 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: COLORS.accent,
     marginRight: 8,
   },
   infoBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: `${COLORS.accent}20`,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
   },
   infoText: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: COLORS.accent,
     marginLeft: 10,
     fontWeight: '600',
   },
   includesContainer: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
   },
   includesTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
     marginBottom: 16,
   },
   includeItem: {
@@ -208,7 +224,7 @@ const styles = StyleSheet.create({
   },
   includeText: {
     fontSize: 14,
-    color: '#ddd',
+    color: COLORS.textSecondary,
     marginLeft: 12,
   },
 });
