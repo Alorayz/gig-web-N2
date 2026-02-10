@@ -575,6 +575,55 @@ async def trigger_ai_search(app_name: str):
         logging.error(f"AI search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI search failed: {str(e)}")
 
+# ============== PDF GUIDES DOWNLOAD ==============
+
+GUIDES_DIR = Path("/app/frontend/assets/guides")
+
+@api_router.get("/download-guide/{app_name}/{language}")
+async def download_guide(app_name: str, language: str):
+    """Download PDF guide for a specific app"""
+    valid_apps = ["spark", "doordash", "instacart", "google_voice"]
+    valid_languages = ["en", "es"]
+    
+    if app_name.lower() not in valid_apps:
+        raise HTTPException(status_code=400, detail="Invalid app name")
+    if language.lower() not in valid_languages:
+        raise HTTPException(status_code=400, detail="Invalid language")
+    
+    filename = f"{app_name.lower()}_guide_{language.lower()}.pdf"
+    filepath = GUIDES_DIR / filename
+    
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Guide not found")
+    
+    return FileResponse(
+        path=str(filepath),
+        filename=filename,
+        media_type="application/pdf"
+    )
+
+@api_router.get("/guides-list")
+async def list_available_guides():
+    """List all available PDF guides"""
+    guides = []
+    apps = ["spark", "doordash", "instacart", "google_voice"]
+    languages = [("en", "English"), ("es", "Español")]
+    
+    for app in apps:
+        for lang_code, lang_name in languages:
+            filename = f"{app}_guide_{lang_code}.pdf"
+            filepath = GUIDES_DIR / filename
+            if filepath.exists():
+                guides.append({
+                    "app": app,
+                    "language": lang_code,
+                    "language_name": lang_name,
+                    "filename": filename,
+                    "download_url": f"/api/download-guide/{app}/{lang_code}"
+                })
+    
+    return guides
+
 # ============== DEFAULT DATA ==============
 
 DEFAULT_TERMS_EN = """
