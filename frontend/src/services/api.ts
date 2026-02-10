@@ -29,6 +29,11 @@ export const confirmPayment = async (paymentIntentId: string) => {
   return response.data;
 };
 
+export const verifyCheckoutSession = async (sessionId: string) => {
+  const response = await api.post(`/stripe/verify-checkout/${sessionId}`);
+  return response.data;
+};
+
 export const createCheckoutSession = async (userId: string, appName: string, termsAccepted: boolean) => {
   const response = await api.post('/stripe/create-checkout-session', {
     user_id: userId,
