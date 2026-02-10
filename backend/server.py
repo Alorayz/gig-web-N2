@@ -242,6 +242,60 @@ async def confirm_payment(payment_intent_id: str):
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+class CheckoutSessionRequest(BaseModel):
+    user_id: str
+    app_name: str
+    terms_accepted: bool
+
+@api_router.post("/stripe/create-checkout-session")
+async def create_checkout_session(request: CheckoutSessionRequest):
+    """Create a Stripe Checkout Session for web payments"""
+    try:
+        # Get base URL from environment or use default
+        base_url = os.environ.get('FRONTEND_URL', 'https://gigzipfinder.app')
+        
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'GIG ZipFinder - {request.app_name.title()} Package',
+                        'description': f'5 Hot Zip Codes + {request.app_name.title()} Guide + Google Voice Guide',
+                    },
+                    'unit_amount': 500,  # $5.00 in cents
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=f'{base_url}/results?payment=success&session_id={{CHECKOUT_SESSION_ID}}',
+            cancel_url=f'{base_url}/payment?payment=cancelled',
+            metadata={
+                'user_id': request.user_id,
+                'app_name': request.app_name,
+                'terms_accepted': str(request.terms_accepted)
+            }
+        )
+        
+        # Save payment record
+        payment = Payment(
+            user_id=request.user_id,
+            amount=5.00,
+            currency="usd",
+            app_name=request.app_name,
+            status="pending",
+            stripe_payment_intent_id=session.payment_intent if session.payment_intent else session.id,
+            terms_accepted=request.terms_accepted
+        )
+        await db.payments.insert_one(payment.dict())
+        
+        return {
+            "checkout_url": session.url,
+            "session_id": session.id
+        }
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # ============== ZIP CODES ROUTES ==============
 
 @api_router.get("/zip-codes/{app_name}")
