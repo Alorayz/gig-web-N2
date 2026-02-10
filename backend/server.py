@@ -396,6 +396,62 @@ async def check_payment_by_user_id(user_id: str, app_name: str):
     except stripe.error.StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@api_router.get("/stripe/paid-apps/{user_id}")
+async def get_paid_apps_by_user(user_id: str):
+    """Get all apps that user has paid for"""
+    try:
+        paid_apps = []
+        
+        # Check our database for successful payments
+        payments = await db.payments.find({
+            "user_id": user_id,
+            "status": "succeeded"
+        }).to_list(100)
+        
+        for payment in payments:
+            app_name = payment.get("app_name", "").lower()
+            if app_name and app_name not in paid_apps:
+                paid_apps.append(app_name)
+        
+        # Also search Stripe sessions by metadata
+        try:
+            sessions = stripe.checkout.Session.list(limit=50)
+            for session in sessions.data:
+                if session.payment_status == 'paid':
+                    metadata = session.metadata or {}
+                    if metadata.get('user_id') == user_id:
+                        app_name = metadata.get('app_name', '').lower()
+                        if app_name and app_name not in paid_apps:
+                            paid_apps.append(app_name)
+                            # Also update our database
+                            await db.payments.update_one(
+                                {
+                                    "user_id": user_id,
+                                    "app_name": app_name
+                                },
+                                {
+                                    "$set": {"status": "succeeded"},
+                                    "$setOnInsert": {
+                                        "id": str(uuid.uuid4()),
+                                        "stripe_payment_intent_id": session.payment_intent or session.id,
+                                        "amount": 500,
+                                        "currency": "usd",
+                                        "terms_accepted": True,
+                                        "created_at": datetime.utcnow()
+                                    }
+                                },
+                                upsert=True
+                            )
+        except Exception as e:
+            print(f"Error checking Stripe sessions: {e}")
+        
+        return {
+            "paid_apps": paid_apps,
+            "count": len(paid_apps)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # ============== ZIP CODES ROUTES ==============
 
 @api_router.get("/zip-codes/{app_name}")
