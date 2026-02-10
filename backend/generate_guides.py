@@ -60,7 +60,7 @@ def create_styles():
     ))
     
     styles.add(ParagraphStyle(
-        name='BodyText',
+        name='CustomBodyText',
         parent=styles['Normal'],
         fontSize=11,
         textColor=TEXT_COLOR,
@@ -80,7 +80,7 @@ def create_styles():
     ))
     
     styles.add(ParagraphStyle(
-        name='Footer',
+        name='FooterText',
         parent=styles['Normal'],
         fontSize=9,
         textColor=colors.gray,
