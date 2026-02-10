@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,84 +9,27 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  TextInput,
-  KeyboardAvoidingView,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
+import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp, createCheckoutSession } from '../src/services/api';
 
-// Stripe configuration
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_51Sz8H72STw3g54WACbPaL387dozfL7vQRaf5puX5DolEoVdM16B27RMfOlCC8NNOtXc2yXBeAA2G4QG5aXOqgeyc00WNUE0AhH';
+// For native platforms, we'll use Stripe's PaymentSheet
+let useStripe: any = null;
+let usePaymentSheet: any = null;
 
-// Card type detection based on BIN (Bank Identification Number)
-const detectCardType = (cardNumber: string): { type: string; icon: string; color: string } | null => {
-  const cleanNumber = cardNumber.replace(/\s/g, '');
-  
-  if (!cleanNumber) return null;
-  
-  // Visa: Starts with 4
-  if (/^4/.test(cleanNumber)) {
-    return { type: 'VISA', icon: 'card', color: '#1A1F71' };
+if (Platform.OS !== 'web') {
+  try {
+    const stripeNative = require('@stripe/stripe-react-native');
+    useStripe = stripeNative.useStripe;
+    usePaymentSheet = stripeNative.usePaymentSheet;
+  } catch (e) {
+    console.log('Stripe native not available');
   }
-  
-  // Mastercard: Starts with 51-55 or 2221-2720
-  if (/^5[1-5]/.test(cleanNumber) || /^2[2-7]/.test(cleanNumber)) {
-    return { type: 'Mastercard', icon: 'card', color: '#EB001B' };
-  }
-  
-  // American Express: Starts with 34 or 37
-  if (/^3[47]/.test(cleanNumber)) {
-    return { type: 'AMEX', icon: 'card', color: '#006FCF' };
-  }
-  
-  // Discover: Starts with 6011, 622126-622925, 644-649, 65
-  if (/^6011/.test(cleanNumber) || /^64[4-9]/.test(cleanNumber) || /^65/.test(cleanNumber) || /^622/.test(cleanNumber)) {
-    return { type: 'Discover', icon: 'card', color: '#FF6000' };
-  }
-  
-  // JCB: Starts with 3528-3589
-  if (/^35[2-8]/.test(cleanNumber)) {
-    return { type: 'JCB', icon: 'card', color: '#0B4EA2' };
-  }
-  
-  // Diners Club: Starts with 300-305, 36, 38-39
-  if (/^3(?:0[0-5]|[68])/.test(cleanNumber)) {
-    return { type: 'Diners', icon: 'card', color: '#004A97' };
-  }
-  
-  // UnionPay: Starts with 62
-  if (/^62/.test(cleanNumber)) {
-    return { type: 'UnionPay', icon: 'card', color: '#D81E06' };
-  }
-  
-  return null;
-};
-
-// Luhn algorithm to validate card number
-const isValidCardNumber = (cardNumber: string): boolean => {
-  const cleanNumber = cardNumber.replace(/\s/g, '');
-  if (!/^\d{13,19}$/.test(cleanNumber)) return false;
-  
-  let sum = 0;
-  let isEven = false;
-  
-  for (let i = cleanNumber.length - 1; i >= 0; i--) {
-    let digit = parseInt(cleanNumber[i], 10);
-    
-    if (isEven) {
-      digit *= 2;
-      if (digit > 9) digit -= 9;
-    }
-    
-    sum += digit;
-    isEven = !isEven;
-  }
-  
-  return sum % 10 === 0;
-};
+}
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -107,18 +50,11 @@ export default function PaymentScreen() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'loading' | 'ready' | 'processing' | 'success' | 'failed'>('idle');
   const [currentPaymentIntentId, setCurrentPaymentIntentId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  
-  // Card input state - TEMPORARY only for UI, sent directly to Stripe
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvc, setCvc] = useState('');
-  const [cardholderName, setCardholderName] = useState('');
-  const [showCardForm, setShowCardForm] = useState(false);
-  const [cardType, setCardType] = useState<{ type: string; icon: string; color: string } | null>(null);
-  const [cardError, setCardError] = useState<string | null>(null);
-  
-  // Refs for stripe instance
-  const stripeRef = useRef<any>(null);
+  const [paymentSheetReady, setPaymentSheetReady] = useState(false);
+
+  // Native Stripe hooks
+  const stripeHook = Platform.OS !== 'web' && useStripe ? useStripe() : null;
+  const paymentSheetHook = Platform.OS !== 'web' && usePaymentSheet ? usePaymentSheet() : null;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -132,13 +68,6 @@ export default function PaymentScreen() {
     return () => clearTimeout(timer);
   }, [selectedApp, termsAccepted]);
 
-  // Detect card type when card number changes
-  useEffect(() => {
-    const detected = detectCardType(cardNumber);
-    setCardType(detected);
-    setCardError(null);
-  }, [cardNumber]);
-
   const initializePayment = async () => {
     if (!selectedApp) return;
     
@@ -150,10 +79,26 @@ export default function PaymentScreen() {
       const paymentData = await createPaymentIntent(userId, selectedApp, termsAccepted);
       setCurrentPaymentIntentId(paymentData.payment_intent_id);
       setClientSecret(paymentData.client_secret);
-      setPaymentStatus('ready');
+
+      // For native apps, initialize PaymentSheet
+      if (Platform.OS !== 'web' && paymentSheetHook?.initPaymentSheet) {
+        const { error } = await paymentSheetHook.initPaymentSheet({
+          paymentIntentClientSecret: paymentData.client_secret,
+          merchantDisplayName: 'GIG ZipFinder',
+          style: 'automatic',
+          allowsDelayedPaymentMethods: false,
+        });
+
+        if (error) {
+          console.error('PaymentSheet init error:', error);
+          setPaymentStatus('failed');
+          Alert.alert('Error', error.message);
+          return;
+        }
+        setPaymentSheetReady(true);
+      }
       
-      // Pre-load Stripe.js
-      await loadStripeJs();
+      setPaymentStatus('ready');
     } catch (error: any) {
       console.error('Payment initialization error:', error);
       setPaymentStatus('failed');
@@ -166,148 +111,129 @@ export default function PaymentScreen() {
     }
   };
 
-  // Load Stripe.js for web - card data goes DIRECTLY to Stripe, never stored in app
-  const loadStripeJs = (): Promise<any> => {
-    return new Promise((resolve) => {
-      if (Platform.OS !== 'web') {
-        resolve(null);
-        return;
+  const handleNativePayment = async () => {
+    if (!paymentSheetHook?.presentPaymentSheet || !currentPaymentIntentId) {
+      Alert.alert('Error', 'Payment not ready');
+      return;
+    }
+
+    setPaymentStatus('processing');
+
+    try {
+      const { error } = await paymentSheetHook.presentPaymentSheet();
+
+      if (error) {
+        if (error.code === 'Canceled') {
+          setPaymentStatus('ready');
+          return;
+        }
+        throw error;
       }
 
-      if (stripeRef.current) {
-        resolve(stripeRef.current);
-        return;
-      }
-
-      if ((window as any).Stripe) {
-        stripeRef.current = (window as any).Stripe(STRIPE_PUBLISHABLE_KEY);
-        resolve(stripeRef.current);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://js.stripe.com/v3/';
-      script.onload = () => {
-        stripeRef.current = (window as any).Stripe(STRIPE_PUBLISHABLE_KEY);
-        resolve(stripeRef.current);
-      };
-      script.onerror = () => resolve(null);
-      document.head.appendChild(script);
-    });
+      // Payment successful
+      await verifyAndComplete();
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      setPaymentStatus('failed');
+      Alert.alert(
+        t('payment.failed'),
+        error.message || t('payment.tryAgain'),
+        [{ text: 'OK', onPress: () => setPaymentStatus('ready') }]
+      );
+    }
   };
 
-  const handleOpenPaymentForm = () => {
-    if (!clientSecret) {
+  const handleWebPayment = async () => {
+    if (!clientSecret || !currentPaymentIntentId) {
       Alert.alert(
         language === 'en' ? 'Please Wait' : 'Por Favor Espere',
         language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
       );
       return;
     }
-    setShowCardForm(true);
-  };
-
-  const handlePayNow = async () => {
-    if (!clientSecret || !currentPaymentIntentId) return;
-    
-    // Validate card number
-    const cleanCardNumber = cardNumber.replace(/\s/g, '');
-    if (!isValidCardNumber(cleanCardNumber)) {
-      setCardError(language === 'en' ? 'Invalid card number' : 'Número de tarjeta inválido');
-      return;
-    }
-    
-    // Validate expiry
-    const [expMonth, expYear] = expiryDate.split('/').map(s => s.trim());
-    if (!expMonth || !expYear || parseInt(expMonth) < 1 || parseInt(expMonth) > 12) {
-      setCardError(language === 'en' ? 'Invalid expiry date' : 'Fecha de vencimiento inválida');
-      return;
-    }
-    
-    // Validate CVC
-    const cvcLength = cardType?.type === 'AMEX' ? 4 : 3;
-    if (cvc.length < cvcLength) {
-      setCardError(language === 'en' ? 'Invalid CVC' : 'CVC inválido');
-      return;
-    }
 
     setPaymentStatus('processing');
-    setCardError(null);
 
     try {
-      const stripeJs = await loadStripeJs();
-      if (!stripeJs) {
-        throw new Error(language === 'en' ? 'Payment system not available' : 'Sistema de pago no disponible');
-      }
-
-      // Create payment method - card data sent DIRECTLY to Stripe's servers
-      // Data is NOT stored in our app or backend
-      const { error: pmError, paymentMethod } = await stripeJs.createPaymentMethod({
-        type: 'card',
-        card: {
-          number: cleanCardNumber,
-          exp_month: parseInt(expMonth, 10),
-          exp_year: parseInt(expYear.length === 2 ? `20${expYear}` : expYear, 10),
-          cvc: cvc,
-        },
-        billing_details: {
-          name: cardholderName || undefined,
-        },
-      });
-
-      if (pmError) {
-        throw pmError;
-      }
-
-      // IMPORTANT: Clear card data from memory immediately after sending to Stripe
-      setCardNumber('');
-      setExpiryDate('');
-      setCvc('');
-      setCardholderName('');
-
-      // Confirm the payment with Stripe using the secure payment method
-      const { error, paymentIntent } = await stripeJs.confirmCardPayment(clientSecret, {
-        payment_method: paymentMethod.id,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (paymentIntent?.status === 'succeeded') {
-        // Verify with our backend (only sends payment_intent_id, NOT card data)
-        await confirmPayment(currentPaymentIntentId);
-        await completePayment();
-      } else if (paymentIntent?.status === 'requires_action') {
-        // 3D Secure authentication required - Stripe handles this automatically
-        Alert.alert(
-          language === 'en' ? 'Authentication Required' : 'Autenticación Requerida',
-          language === 'en' 
-            ? 'Please complete the authentication in the popup window' 
-            : 'Por favor complete la autenticación en la ventana emergente'
-        );
-      } else {
-        throw new Error(language === 'en' ? 'Payment not completed' : 'Pago no completado');
+      // Create a Stripe Checkout session for web
+      const checkoutData = await createCheckoutSession(userId, selectedApp!, termsAccepted);
+      
+      if (checkoutData.checkout_url) {
+        // Open Stripe Checkout in browser
+        const canOpen = await Linking.canOpenURL(checkoutData.checkout_url);
+        if (canOpen) {
+          await Linking.openURL(checkoutData.checkout_url);
+          
+          // Show instructions to user
+          Alert.alert(
+            language === 'en' ? 'Complete Payment' : 'Completar Pago',
+            language === 'en' 
+              ? 'A payment page has opened in your browser. After completing the payment, return here and tap "Verify Payment".' 
+              : 'Se ha abierto una página de pago en su navegador. Después de completar el pago, regrese aquí y toque "Verificar Pago".',
+            [
+              { 
+                text: language === 'en' ? 'Verify Payment' : 'Verificar Pago', 
+                onPress: () => checkPaymentStatus() 
+              },
+              { 
+                text: language === 'en' ? 'Cancel' : 'Cancelar', 
+                style: 'cancel',
+                onPress: () => setPaymentStatus('ready')
+              }
+            ]
+          );
+        }
       }
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error('Checkout error:', error);
       setPaymentStatus('failed');
-      
-      // Clear sensitive data on error too
-      setCvc('');
-      
-      const errorMessage = error.message || error.decline_code || t('payment.tryAgain');
-      setCardError(errorMessage);
-      
       Alert.alert(
         t('payment.failed'),
-        errorMessage,
+        error.message || t('payment.tryAgain'),
         [{ text: 'OK', onPress: () => setPaymentStatus('ready') }]
       );
     }
   };
 
-  const completePayment = async () => {
+  const checkPaymentStatus = async () => {
+    if (!currentPaymentIntentId) return;
+
+    setPaymentStatus('processing');
+
+    try {
+      const result = await confirmPayment(currentPaymentIntentId);
+      
+      if (result.status === 'succeeded') {
+        await verifyAndComplete();
+      } else {
+        Alert.alert(
+          language === 'en' ? 'Payment Pending' : 'Pago Pendiente',
+          language === 'en' 
+            ? 'Payment not yet completed. Please complete the payment in your browser and try again.' 
+            : 'El pago aún no se ha completado. Por favor complete el pago en su navegador e intente de nuevo.',
+          [
+            { 
+              text: language === 'en' ? 'Check Again' : 'Verificar de Nuevo', 
+              onPress: () => checkPaymentStatus() 
+            },
+            { 
+              text: language === 'en' ? 'Cancel' : 'Cancelar', 
+              style: 'cancel',
+              onPress: () => setPaymentStatus('ready')
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      setPaymentStatus('ready');
+      Alert.alert(
+        language === 'en' ? 'Error' : 'Error',
+        language === 'en' ? 'Could not verify payment status' : 'No se pudo verificar el estado del pago'
+      );
+    }
+  };
+
+  const verifyAndComplete = async () => {
     if (!currentPaymentIntentId) return;
 
     try {
@@ -336,29 +262,12 @@ export default function PaymentScreen() {
     }
   };
 
-  const formatCardNumber = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    const isAmex = /^3[47]/.test(cleaned);
-    
-    if (isAmex) {
-      // AMEX format: XXXX XXXXXX XXXXX
-      const part1 = cleaned.substring(0, 4);
-      const part2 = cleaned.substring(4, 10);
-      const part3 = cleaned.substring(10, 15);
-      return [part1, part2, part3].filter(Boolean).join(' ');
+  const handlePayment = () => {
+    if (Platform.OS !== 'web' && paymentSheetReady) {
+      handleNativePayment();
     } else {
-      // Standard format: XXXX XXXX XXXX XXXX
-      const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-      return formatted.substring(0, 19);
+      handleWebPayment();
     }
-  };
-
-  const formatExpiryDate = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    if (cleaned.length >= 2) {
-      return `${cleaned.substring(0, 2)}/${cleaned.substring(2, 4)}`;
-    }
-    return cleaned;
   };
 
   const getAppIcon = () => {
@@ -377,10 +286,6 @@ export default function PaymentScreen() {
       case 'instacart': return '#4CAF50';
       default: return COLORS.accent;
     }
-  };
-
-  const getMaxCvcLength = () => {
-    return cardType?.type === 'AMEX' ? 4 : 3;
   };
 
   if (isChecking) {
@@ -420,305 +325,173 @@ export default function PaymentScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* App Badge */}
-          <View style={[styles.appBadge, { backgroundColor: `${getAppColor()}20` }]}>
-            <Ionicons name={getAppIcon() as any} size={30} color={getAppColor()} />
-            <Text style={[styles.appName, { color: getAppColor() }]}>
-              {selectedApp?.toUpperCase()}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* App Badge */}
+        <View style={[styles.appBadge, { backgroundColor: `${getAppColor()}20` }]}>
+          <Ionicons name={getAppIcon() as any} size={30} color={getAppColor()} />
+          <Text style={[styles.appName, { color: getAppColor() }]}>
+            {selectedApp?.toUpperCase()}
+          </Text>
+        </View>
+
+        {/* Price Display */}
+        <View style={styles.priceContainer}>
+          <Text style={styles.priceLabel}>{t('payment.amount')}</Text>
+          <Text style={styles.price}>$5.00</Text>
+          <Text style={styles.priceDescription}>{t('payment.description')}</Text>
+        </View>
+
+        {/* What's Included */}
+        <View style={styles.includesContainer}>
+          <Text style={styles.includesTitle}>{t('payment.includes')}</Text>
+          
+          <View style={styles.includeItem}>
+            <Ionicons name="location" size={24} color={COLORS.accent} />
+            <Text style={styles.includeText}>{t('payment.item1')}</Text>
+          </View>
+          
+          <View style={styles.includeItem}>
+            <Ionicons name="book" size={24} color={COLORS.accent} />
+            <Text style={styles.includeText}>{t('payment.item2')}</Text>
+          </View>
+          
+          <View style={styles.includeItem}>
+            <Ionicons name="call" size={24} color={COLORS.accent} />
+            <Text style={styles.includeText}>{t('payment.item3')}</Text>
+          </View>
+        </View>
+
+        {/* Payment Ready Notice */}
+        {paymentStatus === 'ready' && (
+          <View style={styles.readyNotice}>
+            <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+            <Text style={styles.readyNoticeText}>
+              {Platform.OS !== 'web' 
+                ? (language === 'en' 
+                    ? 'Ready! Tap below to open secure payment form' 
+                    : 'Listo! Toque abajo para abrir formulario de pago seguro')
+                : (language === 'en'
+                    ? 'Ready! Tap to pay via Stripe Checkout'
+                    : 'Listo! Toque para pagar via Stripe Checkout')
+              }
             </Text>
           </View>
+        )}
 
-          {/* Price Display */}
-          <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>{t('payment.amount')}</Text>
-            <Text style={styles.price}>$5.00</Text>
-            <Text style={styles.priceDescription}>{t('payment.description')}</Text>
+        {/* Loading Notice */}
+        {paymentStatus === 'loading' && (
+          <View style={styles.loadingNotice}>
+            <ActivityIndicator size="small" color={COLORS.accent} />
+            <Text style={styles.loadingNoticeText}>
+              {language === 'en' 
+                ? 'Preparing secure payment...' 
+                : 'Preparando pago seguro...'}
+            </Text>
           </View>
+        )}
 
-          {/* What's Included */}
-          <View style={styles.includesContainer}>
-            <Text style={styles.includesTitle}>{t('payment.includes')}</Text>
-            
-            <View style={styles.includeItem}>
-              <Ionicons name="location" size={24} color={COLORS.accent} />
-              <Text style={styles.includeText}>{t('payment.item1')}</Text>
-            </View>
-            
-            <View style={styles.includeItem}>
-              <Ionicons name="book" size={24} color={COLORS.accent} />
-              <Text style={styles.includeText}>{t('payment.item2')}</Text>
-            </View>
-            
-            <View style={styles.includeItem}>
-              <Ionicons name="call" size={24} color={COLORS.accent} />
-              <Text style={styles.includeText}>{t('payment.item3')}</Text>
-            </View>
-          </View>
+        {/* Security Badge */}
+        <View style={styles.securityBadge}>
+          <Ionicons name="shield-checkmark" size={20} color={COLORS.accent} />
+          <Text style={styles.securityText}>{t('payment.secure')}</Text>
+        </View>
 
-          {/* Card Form */}
-          {showCardForm && (
-            <View style={styles.cardFormContainer}>
-              <View style={styles.cardFormHeader}>
-                <Text style={styles.cardFormTitle}>
-                  {language === 'en' ? 'Card Details' : 'Datos de Tarjeta'}
-                </Text>
-                <View style={styles.secureIndicator}>
-                  <Ionicons name="lock-closed" size={14} color={COLORS.success} />
-                  <Text style={styles.secureText}>
-                    {language === 'en' ? 'Secure' : 'Seguro'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Cardholder Name */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>
-                  {language === 'en' ? 'Cardholder Name' : 'Nombre del Titular'}
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={language === 'en' ? 'JOHN DOE' : 'JUAN PÉREZ'}
-                  placeholderTextColor={COLORS.textMuted}
-                  value={cardholderName}
-                  onChangeText={setCardholderName}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                />
-              </View>
-
-              {/* Card Number with Type Detection */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>
-                  {language === 'en' ? 'Card Number' : 'Número de Tarjeta'}
-                </Text>
-                <View style={styles.cardInputContainer}>
-                  <TextInput
-                    style={[styles.input, styles.cardInput]}
-                    placeholder="0000 0000 0000 0000"
-                    placeholderTextColor={COLORS.textMuted}
-                    value={cardNumber}
-                    onChangeText={(text) => setCardNumber(formatCardNumber(text))}
-                    keyboardType="numeric"
-                    maxLength={cardType?.type === 'AMEX' ? 17 : 19}
-                    autoCorrect={false}
-                  />
-                  {/* Card Type Indicator */}
-                  {cardType && (
-                    <View style={[styles.cardTypeIndicator, { backgroundColor: cardType.color }]}>
-                      <Text style={styles.cardTypeText}>{cardType.type}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {/* Expiry and CVC Row */}
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                  <Text style={styles.inputLabel}>
-                    {language === 'en' ? 'Expiry' : 'Vencimiento'}
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="MM/YY"
-                    placeholderTextColor={COLORS.textMuted}
-                    value={expiryDate}
-                    onChangeText={(text) => setExpiryDate(formatExpiryDate(text))}
-                    keyboardType="numeric"
-                    maxLength={5}
-                    autoCorrect={false}
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.inputLabel}>
-                    CVC {cardType?.type === 'AMEX' ? '(4 digits)' : '(3 digits)'}
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={cardType?.type === 'AMEX' ? '0000' : '000'}
-                    placeholderTextColor={COLORS.textMuted}
-                    value={cvc}
-                    onChangeText={setCvc}
-                    keyboardType="numeric"
-                    maxLength={getMaxCvcLength()}
-                    secureTextEntry
-                    autoCorrect={false}
-                  />
-                </View>
-              </View>
-
-              {/* Error Message */}
-              {cardError && (
-                <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={16} color={COLORS.error} />
-                  <Text style={styles.errorText}>{cardError}</Text>
-                </View>
-              )}
-
-              {/* Security Notice */}
-              <View style={styles.securityNotice}>
-                <Ionicons name="shield-checkmark" size={16} color={COLORS.textMuted} />
-                <Text style={styles.securityNoticeText}>
-                  {language === 'en' 
-                    ? 'Your card data is sent directly to Stripe and is never stored in this app.' 
-                    : 'Los datos de su tarjeta se envían directamente a Stripe y nunca se guardan en esta app.'}
-                </Text>
-              </View>
-
-              {/* Pay Now Button */}
-              <TouchableOpacity
-                style={[
-                  styles.payButton, 
-                  paymentStatus === 'processing' && styles.payButtonDisabled,
-                  (!cardNumber || !expiryDate || !cvc) && styles.payButtonDisabled
-                ]}
-                onPress={handlePayNow}
-                disabled={paymentStatus === 'processing' || !cardNumber || !expiryDate || !cvc}
-              >
-                {paymentStatus === 'processing' ? (
-                  <>
-                    <ActivityIndicator color="#fff" size="small" />
-                    <Text style={styles.payButtonText}>{t('payment.processing')}</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="lock-closed" size={20} color="#fff" />
-                    <Text style={styles.payButtonText}>
-                      {language === 'en' ? 'Pay $5.00 Securely' : 'Pagar $5.00 de Forma Segura'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* Cancel Button */}
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  // Clear all card data when canceling
-                  setCardNumber('');
-                  setExpiryDate('');
-                  setCvc('');
-                  setCardholderName('');
-                  setCardError(null);
-                  setShowCardForm(false);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>
-                  {language === 'en' ? 'Cancel' : 'Cancelar'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Main Pay Button (before showing card form) */}
-          {!showCardForm && (
+        {/* Pay Button */}
+        <TouchableOpacity
+          style={[
+            styles.payButton, 
+            (paymentStatus === 'loading' || paymentStatus === 'processing') && styles.payButtonDisabled
+          ]}
+          onPress={handlePayment}
+          disabled={paymentStatus === 'loading' || paymentStatus === 'processing'}
+        >
+          {paymentStatus === 'loading' ? (
             <>
-              {/* Payment Ready Notice */}
-              {paymentStatus === 'ready' && (
-                <View style={styles.readyNotice}>
-                  <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                  <Text style={styles.readyNoticeText}>
-                    {language === 'en' 
-                      ? 'Ready to pay - Tap the button below' 
-                      : 'Listo para pagar - Toque el botón'}
-                  </Text>
-                </View>
-              )}
-
-              {/* Loading Notice */}
-              {paymentStatus === 'loading' && (
-                <View style={styles.loadingNotice}>
-                  <ActivityIndicator size="small" color={COLORS.accent} />
-                  <Text style={styles.loadingNoticeText}>
-                    {language === 'en' 
-                      ? 'Preparing secure payment...' 
-                      : 'Preparando pago seguro...'}
-                  </Text>
-                </View>
-              )}
-
-              {/* Security Badge */}
-              <View style={styles.securityBadge}>
-                <Ionicons name="shield-checkmark" size={20} color={COLORS.accent} />
-                <Text style={styles.securityText}>{t('payment.secure')}</Text>
-              </View>
-
-              {/* Pay Button */}
-              <TouchableOpacity
-                style={[
-                  styles.payButton, 
-                  (paymentStatus === 'loading' || paymentStatus === 'failed') && styles.payButtonDisabled
-                ]}
-                onPress={handleOpenPaymentForm}
-                disabled={paymentStatus === 'loading'}
-              >
-                {paymentStatus === 'loading' ? (
-                  <>
-                    <ActivityIndicator color="#fff" size="small" />
-                    <Text style={styles.payButtonText}>
-                      {language === 'en' ? 'Loading...' : 'Cargando...'}
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="card" size={24} color="#fff" />
-                    <Text style={styles.payButtonText}>
-                      {language === 'en' ? 'Pay $5.00 with Card' : 'Pagar $5.00 con Tarjeta'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.payButtonText}>
+                {language === 'en' ? 'Loading...' : 'Cargando...'}
+              </Text>
+            </>
+          ) : paymentStatus === 'processing' ? (
+            <>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.payButtonText}>{t('payment.processing')}</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="card" size={24} color="#fff" />
+              <Text style={styles.payButtonText}>
+                {language === 'en' ? 'Pay $5.00 Securely' : 'Pagar $5.00 de Forma Segura'}
+              </Text>
             </>
           )}
+        </TouchableOpacity>
 
-          {/* Supported Cards */}
-          <View style={styles.supportedCards}>
-            <Text style={styles.supportedCardsTitle}>
-              {language === 'en' ? 'Accepted Cards' : 'Tarjetas Aceptadas'}
+        {/* Verify Payment Button (for web after redirect) */}
+        {Platform.OS === 'web' && paymentStatus === 'ready' && currentPaymentIntentId && (
+          <TouchableOpacity
+            style={styles.verifyButton}
+            onPress={checkPaymentStatus}
+          >
+            <Ionicons name="refresh" size={20} color={COLORS.accent} />
+            <Text style={styles.verifyButtonText}>
+              {language === 'en' ? 'Already Paid? Verify Payment' : '¿Ya Pagó? Verificar Pago'}
             </Text>
-            <View style={styles.cardLogos}>
-              <View style={[styles.cardLogo, { backgroundColor: '#1A1F71' }]}>
-                <Text style={styles.cardLogoText}>VISA</Text>
-              </View>
-              <View style={[styles.cardLogo, { backgroundColor: '#EB001B' }]}>
-                <Text style={styles.cardLogoText}>MC</Text>
-              </View>
-              <View style={[styles.cardLogo, { backgroundColor: '#006FCF' }]}>
-                <Text style={styles.cardLogoText}>AMEX</Text>
-              </View>
-              <View style={[styles.cardLogo, { backgroundColor: '#FF6000' }]}>
-                <Text style={styles.cardLogoText}>DISC</Text>
-              </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Supported Cards */}
+        <View style={styles.supportedCards}>
+          <Text style={styles.supportedCardsTitle}>
+            {language === 'en' ? 'Accepted Cards' : 'Tarjetas Aceptadas'}
+          </Text>
+          <View style={styles.cardLogos}>
+            <View style={[styles.cardLogo, { backgroundColor: '#1A1F71' }]}>
+              <Text style={styles.cardLogoText}>VISA</Text>
+            </View>
+            <View style={[styles.cardLogo, { backgroundColor: '#EB001B' }]}>
+              <Text style={styles.cardLogoText}>MC</Text>
+            </View>
+            <View style={[styles.cardLogo, { backgroundColor: '#006FCF' }]}>
+              <Text style={styles.cardLogoText}>AMEX</Text>
+            </View>
+            <View style={[styles.cardLogo, { backgroundColor: '#FF6000' }]}>
+              <Text style={styles.cardLogoText}>DISC</Text>
             </View>
           </View>
+        </View>
 
-          {/* Stripe Logo */}
-          <View style={styles.stripeInfo}>
-            <Text style={styles.stripeText}>
-              {language === 'en' ? 'Powered by' : 'Procesado por'} 
+        {/* Stripe Logo */}
+        <View style={styles.stripeInfo}>
+          <Ionicons name="lock-closed" size={14} color={COLORS.textMuted} />
+          <Text style={styles.stripeText}>
+            {language === 'en' ? 'Powered by' : 'Procesado por'} 
+          </Text>
+          <Text style={styles.stripeBrand}>Stripe</Text>
+        </View>
+
+        {/* Security Notice */}
+        <View style={styles.securityNotice}>
+          <Text style={styles.securityNoticeText}>
+            {language === 'en' 
+              ? 'Your card details are handled securely by Stripe. We never store your card information.' 
+              : 'Los datos de su tarjeta son manejados de forma segura por Stripe. Nunca almacenamos su información de tarjeta.'}
+          </Text>
+        </View>
+
+        {/* Retry Button if failed */}
+        {paymentStatus === 'failed' && (
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={initializePayment}
+          >
+            <Ionicons name="refresh" size={20} color={COLORS.accent} />
+            <Text style={styles.retryButtonText}>
+              {language === 'en' ? 'Try Again' : 'Intentar de Nuevo'}
             </Text>
-            <Text style={styles.stripeBrand}>Stripe</Text>
-          </View>
-
-          {/* Retry Button if failed */}
-          {paymentStatus === 'failed' && !showCardForm && (
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={initializePayment}
-            >
-              <Ionicons name="refresh" size={20} color={COLORS.accent} />
-              <Text style={styles.retryButtonText}>
-                {language === 'en' ? 'Try Again' : 'Intentar de Nuevo'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -827,112 +600,6 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     flex: 1,
   },
-  cardFormContainer: {
-    width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: COLORS.accent,
-  },
-  cardFormHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  cardFormTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  secureIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${COLORS.success}20`,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  secureText: {
-    fontSize: 12,
-    color: COLORS.success,
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    borderWidth: 1,
-    borderColor: COLORS.primaryLight,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  cardInputContainer: {
-    position: 'relative',
-  },
-  cardInput: {
-    paddingRight: 80,
-  },
-  cardTypeIndicator: {
-    position: 'absolute',
-    right: 12,
-    top: '50%',
-    marginTop: -12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  cardTypeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  inputRow: {
-    flexDirection: 'row',
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${COLORS.error}15`,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: COLORS.error,
-    fontSize: 13,
-    marginLeft: 8,
-    flex: 1,
-  },
-  securityNotice: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: COLORS.background,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  securityNoticeText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginLeft: 8,
-    flex: 1,
-    lineHeight: 16,
-  },
   readyNotice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -986,7 +653,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     borderRadius: 30,
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1004,13 +671,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
-  cancelButton: {
+  verifyButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    marginBottom: 20,
   },
-  cancelButtonText: {
-    color: COLORS.textMuted,
+  verifyButtonText: {
+    color: COLORS.accent,
     fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   supportedCards: {
     alignItems: 'center',
@@ -1038,17 +715,30 @@ const styles = StyleSheet.create({
   stripeInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   stripeText: {
     fontSize: 12,
     color: COLORS.textMuted,
+    marginLeft: 6,
   },
   stripeBrand: {
     fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.textSecondary,
     marginLeft: 4,
+  },
+  securityNotice: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  securityNoticeText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   retryButton: {
     flexDirection: 'row',
