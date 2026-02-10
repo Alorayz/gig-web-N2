@@ -305,22 +305,57 @@ async def verify_checkout_session(session_id: str):
         session = stripe.checkout.Session.retrieve(session_id)
         
         if session.payment_status == 'paid':
-            # Update payment record in database
+            # Get metadata
+            metadata = session.metadata or {}
+            user_id = metadata.get('user_id', 'unknown')
+            app_name = metadata.get('app_name', 'unknown')
+            
+            # Upsert payment record - create if not exists, update if exists
             await db.payments.update_one(
                 {"stripe_payment_intent_id": session_id},
-                {"$set": {"status": "succeeded"}}
+                {
+                    "$set": {
+                        "status": "succeeded",
+                        "user_id": user_id,
+                        "app_name": app_name,
+                    },
+                    "$setOnInsert": {
+                        "id": str(uuid.uuid4()),
+                        "amount": 5.00,
+                        "currency": "usd",
+                        "terms_accepted": True,
+                        "created_at": datetime.utcnow()
+                    }
+                },
+                upsert=True
             )
             
-            # Also try to update by payment_intent if available
+            # Also update by payment_intent if available
             if session.payment_intent:
                 await db.payments.update_one(
                     {"stripe_payment_intent_id": session.payment_intent},
-                    {"$set": {"status": "succeeded"}}
+                    {
+                        "$set": {
+                            "status": "succeeded",
+                            "user_id": user_id,
+                            "app_name": app_name,
+                        },
+                        "$setOnInsert": {
+                            "id": str(uuid.uuid4()),
+                            "amount": 5.00,
+                            "currency": "usd",
+                            "terms_accepted": True,
+                            "created_at": datetime.utcnow()
+                        }
+                    },
+                    upsert=True
                 )
             
             return {
                 "status": "succeeded",
                 "payment_status": session.payment_status,
+                "app_name": app_name,
+                "user_id": user_id,
                 "customer_email": session.customer_details.email if session.customer_details else None
             }
         else:
