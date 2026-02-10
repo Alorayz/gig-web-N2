@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents for verification",
         "NSPhotoLibraryUsageDescription": "Upload profile photos"
-      }
+      },
+      "associatedDomains": ["applinks:gigzipfinder.app"]
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +26,20 @@
       "package": "com.gigzipfinder.app",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE"
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.INTERNET"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "gigzipfinder"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
@@ -48,6 +62,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "gig-zipfinder"
+      }
     }
   }
 }
