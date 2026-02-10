@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   SafeAreaView,
   ScrollView,
   Dimensions,
+  Linking,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useLanguageStore } from '../src/stores/languageStore';
+import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
 
 const { width } = Dimensions.get('window');
@@ -20,8 +23,27 @@ type TabType = 'zipcodes' | 'guide' | 'voice';
 export default function ResultsScreen() {
   const router = useRouter();
   const { language, t } = useLanguageStore();
-  const { selectedApp, zipCodes, guides, voiceGuides, reset } = useAppStore();
+  const { selectedApp, zipCodes, guides, voiceGuides, paymentComplete, reset } = useAppStore();
   const [activeTab, setActiveTab] = useState<TabType>('zipcodes');
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    // Verify payment was completed before showing results
+    const timer = setTimeout(() => {
+      if (!paymentComplete || !selectedApp) {
+        Alert.alert(
+          language === 'en' ? 'Access Denied' : 'Acceso Denegado',
+          language === 'en' 
+            ? 'You must complete payment to access this content.' 
+            : 'Debe completar el pago para acceder a este contenido.',
+          [{ text: 'OK', onPress: () => router.replace('/') }]
+        );
+        return;
+      }
+      setIsChecking(false);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [paymentComplete, selectedApp]);
 
   const getAppIcon = () => {
     switch (selectedApp) {
@@ -37,7 +59,7 @@ export default function ResultsScreen() {
       case 'spark': return '#FFC107';
       case 'doordash': return '#FF5722';
       case 'instacart': return '#4CAF50';
-      default: return '#4CAF50';
+      default: return COLORS.accent;
     }
   };
 
@@ -51,6 +73,27 @@ export default function ResultsScreen() {
     router.replace('/');
   };
 
+  const handleDownloadPdf = async (appName: string) => {
+    const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://gig-zipfinder.preview.emergentagent.com';
+    const url = `${baseUrl}/api/download-guide/${appName}/${language}`;
+    
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('Error', language === 'en' ? 'Could not open PDF' : 'No se pudo abrir el PDF');
+    }
+  };
+
+  if (isChecking) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.accent} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const renderZipCodes = () => (
     <View style={styles.contentContainer}>
       {zipCodes.length > 0 ? (
@@ -58,7 +101,7 @@ export default function ResultsScreen() {
           <View key={zip.id || index} style={styles.zipCard}>
             <View style={styles.zipHeader}>
               <View style={styles.zipCodeBadge}>
-                <Ionicons name="location" size={20} color="#4CAF50" />
+                <Ionicons name="location" size={20} color={COLORS.accent} />
                 <Text style={styles.zipCodeText}>{zip.zip_code}</Text>
               </View>
               <View style={styles.scoreBadge}>
@@ -73,10 +116,19 @@ export default function ResultsScreen() {
         ))
       ) : (
         <View style={styles.emptyContainer}>
-          <Ionicons name="sad-outline" size={60} color="#888" />
+          <Ionicons name="sad-outline" size={60} color={COLORS.textMuted} />
           <Text style={styles.emptyText}>{t('results.noZipCodes')}</Text>
         </View>
       )}
+      
+      {/* Download PDF Button */}
+      <TouchableOpacity
+        style={styles.downloadButton}
+        onPress={() => handleDownloadPdf(selectedApp || 'spark')}
+      >
+        <Ionicons name="download" size={20} color="#fff" />
+        <Text style={styles.downloadButtonText}>{t('results.downloadPdf')}</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -85,7 +137,7 @@ export default function ResultsScreen() {
       {guides.map((guide: any, index: number) => (
         <View key={guide.id || index} style={styles.guideCard}>
           <View style={styles.guideHeader}>
-            <View style={styles.stepBadge}>
+            <View style={[styles.stepBadge, { backgroundColor: getAppColor() }]}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
             </View>
             <Text style={styles.guideTitle}>
@@ -97,13 +149,22 @@ export default function ResultsScreen() {
           </Text>
         </View>
       ))}
+      
+      {/* Download PDF Button */}
+      <TouchableOpacity
+        style={styles.downloadButton}
+        onPress={() => handleDownloadPdf(selectedApp || 'spark')}
+      >
+        <Ionicons name="download" size={20} color="#fff" />
+        <Text style={styles.downloadButtonText}>{t('results.downloadPdf')}</Text>
+      </TouchableOpacity>
     </View>
   );
 
   const renderVoiceGuide = () => (
     <View style={styles.contentContainer}>
       <View style={styles.voiceHeader}>
-        <Ionicons name="call" size={40} color="#4CAF50" />
+        <Ionicons name="call" size={40} color={COLORS.accent} />
         <Text style={styles.voiceTitle}>Google Voice</Text>
         <Text style={styles.voiceSubtitle}>
           {language === 'en' ? 'Get a FREE second phone number' : 'Obtén un segundo número de teléfono GRATIS'}
@@ -113,7 +174,7 @@ export default function ResultsScreen() {
       {voiceGuides.map((guide: any, index: number) => (
         <View key={guide.id || index} style={styles.guideCard}>
           <View style={styles.guideHeader}>
-            <View style={[styles.stepBadge, { backgroundColor: '#4CAF50' }]}>
+            <View style={[styles.stepBadge, { backgroundColor: COLORS.accent }]}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
             </View>
             <Text style={styles.guideTitle}>
@@ -125,6 +186,15 @@ export default function ResultsScreen() {
           </Text>
         </View>
       ))}
+      
+      {/* Download PDF Button */}
+      <TouchableOpacity
+        style={styles.downloadButton}
+        onPress={() => handleDownloadPdf('google_voice')}
+      >
+        <Ionicons name="download" size={20} color="#fff" />
+        <Text style={styles.downloadButtonText}>{t('results.downloadPdf')}</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -150,7 +220,7 @@ export default function ResultsScreen() {
           <Ionicons 
             name="location" 
             size={20} 
-            color={activeTab === 'zipcodes' ? '#4CAF50' : '#888'} 
+            color={activeTab === 'zipcodes' ? COLORS.accent : COLORS.textMuted} 
           />
           <Text style={[styles.tabText, activeTab === 'zipcodes' && styles.activeTabText]}>
             {language === 'en' ? 'Zip Codes' : 'Códigos'}
@@ -164,7 +234,7 @@ export default function ResultsScreen() {
           <Ionicons 
             name="book" 
             size={20} 
-            color={activeTab === 'guide' ? '#4CAF50' : '#888'} 
+            color={activeTab === 'guide' ? COLORS.accent : COLORS.textMuted} 
           />
           <Text style={[styles.tabText, activeTab === 'guide' && styles.activeTabText]}>
             {language === 'en' ? 'Guide' : 'Guía'}
@@ -178,7 +248,7 @@ export default function ResultsScreen() {
           <Ionicons 
             name="call" 
             size={20} 
-            color={activeTab === 'voice' ? '#4CAF50' : '#888'} 
+            color={activeTab === 'voice' ? COLORS.accent : COLORS.textMuted} 
           />
           <Text style={[styles.tabText, activeTab === 'voice' && styles.activeTabText]}>
             {language === 'en' ? 'Voice' : 'Voice'}
@@ -199,7 +269,7 @@ export default function ResultsScreen() {
           style={styles.secondaryButton}
           onPress={handleTryAnother}
         >
-          <Ionicons name="refresh" size={20} color="#4CAF50" />
+          <Ionicons name="refresh" size={20} color={COLORS.accent} />
           <Text style={styles.secondaryButtonText}>{t('results.tryAnother')}</Text>
         </TouchableOpacity>
 
@@ -218,13 +288,18 @@ export default function ResultsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: COLORS.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: COLORS.primaryLight,
   },
   appBadge: {
     flexDirection: 'row',
@@ -242,12 +317,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
   },
   tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: COLORS.primaryLight,
   },
   tab: {
     flex: 1,
@@ -259,15 +334,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   activeTab: {
-    borderBottomColor: '#4CAF50',
+    borderBottomColor: COLORS.accent,
   },
   tabText: {
     fontSize: 14,
-    color: '#888',
+    color: COLORS.textMuted,
     marginLeft: 8,
   },
   activeTabText: {
-    color: '#4CAF50',
+    color: COLORS.accent,
     fontWeight: 'bold',
   },
   scrollView: {
@@ -277,12 +352,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   zipCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: COLORS.primaryLight,
   },
   zipHeader: {
     flexDirection: 'row',
@@ -293,7 +368,7 @@ const styles = StyleSheet.create({
   zipCodeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    backgroundColor: `${COLORS.accent}20`,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -301,11 +376,11 @@ const styles = StyleSheet.create({
   zipCodeText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: COLORS.accent,
     marginLeft: 8,
   },
   scoreBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -322,11 +397,11 @@ const styles = StyleSheet.create({
   },
   cityText: {
     fontSize: 16,
-    color: '#fff',
+    color: COLORS.textPrimary,
   },
   scoreLabel: {
     fontSize: 12,
-    color: '#888',
+    color: COLORS.textMuted,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -335,14 +410,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#888',
+    color: COLORS.textMuted,
     marginTop: 16,
   },
   guideCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
   },
   guideHeader: {
     flexDirection: 'row',
@@ -353,7 +430,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FF5722',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -366,38 +442,55 @@ const styles = StyleSheet.create({
   guideTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: COLORS.textPrimary,
     flex: 1,
   },
   guideContent: {
     fontSize: 14,
-    color: '#ddd',
+    color: COLORS.textSecondary,
     lineHeight: 22,
   },
   voiceHeader: {
     alignItems: 'center',
     marginBottom: 20,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: `${COLORS.accent}10`,
     borderRadius: 16,
     padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
   },
   voiceTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: COLORS.accent,
     marginTop: 12,
   },
   voiceSubtitle: {
     fontSize: 14,
-    color: '#aaa',
+    color: COLORS.textSecondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  downloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.accent,
+    paddingVertical: 14,
+    borderRadius: 25,
+    marginTop: 10,
+  },
+  downloadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   footer: {
     flexDirection: 'row',
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: COLORS.primaryLight,
     gap: 12,
   },
   secondaryButton: {
@@ -405,14 +498,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: `${COLORS.accent}10`,
     paddingVertical: 14,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: COLORS.accent,
   },
   secondaryButtonText: {
-    color: '#4CAF50',
+    color: COLORS.accent,
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 8,
@@ -422,7 +515,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.accent,
     paddingVertical: 14,
     borderRadius: 25,
   },
