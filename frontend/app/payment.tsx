@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,73 @@ import { createPaymentIntent, confirmPayment, getZipCodesByApp, getGuidesByApp }
 // Stripe configuration
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_51Sz8H72STw3g54WACbPaL387dozfL7vQRaf5puX5DolEoVdM16B27RMfOlCC8NNOtXc2yXBeAA2G4QG5aXOqgeyc00WNUE0AhH';
 
+// Card type detection based on BIN (Bank Identification Number)
+const detectCardType = (cardNumber: string): { type: string; icon: string; color: string } | null => {
+  const cleanNumber = cardNumber.replace(/\s/g, '');
+  
+  if (!cleanNumber) return null;
+  
+  // Visa: Starts with 4
+  if (/^4/.test(cleanNumber)) {
+    return { type: 'VISA', icon: 'card', color: '#1A1F71' };
+  }
+  
+  // Mastercard: Starts with 51-55 or 2221-2720
+  if (/^5[1-5]/.test(cleanNumber) || /^2[2-7]/.test(cleanNumber)) {
+    return { type: 'Mastercard', icon: 'card', color: '#EB001B' };
+  }
+  
+  // American Express: Starts with 34 or 37
+  if (/^3[47]/.test(cleanNumber)) {
+    return { type: 'AMEX', icon: 'card', color: '#006FCF' };
+  }
+  
+  // Discover: Starts with 6011, 622126-622925, 644-649, 65
+  if (/^6011/.test(cleanNumber) || /^64[4-9]/.test(cleanNumber) || /^65/.test(cleanNumber) || /^622/.test(cleanNumber)) {
+    return { type: 'Discover', icon: 'card', color: '#FF6000' };
+  }
+  
+  // JCB: Starts with 3528-3589
+  if (/^35[2-8]/.test(cleanNumber)) {
+    return { type: 'JCB', icon: 'card', color: '#0B4EA2' };
+  }
+  
+  // Diners Club: Starts with 300-305, 36, 38-39
+  if (/^3(?:0[0-5]|[68])/.test(cleanNumber)) {
+    return { type: 'Diners', icon: 'card', color: '#004A97' };
+  }
+  
+  // UnionPay: Starts with 62
+  if (/^62/.test(cleanNumber)) {
+    return { type: 'UnionPay', icon: 'card', color: '#D81E06' };
+  }
+  
+  return null;
+};
+
+// Luhn algorithm to validate card number
+const isValidCardNumber = (cardNumber: string): boolean => {
+  const cleanNumber = cardNumber.replace(/\s/g, '');
+  if (!/^\d{13,19}$/.test(cleanNumber)) return false;
+  
+  let sum = 0;
+  let isEven = false;
+  
+  for (let i = cleanNumber.length - 1; i >= 0; i--) {
+    let digit = parseInt(cleanNumber[i], 10);
+    
+    if (isEven) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    
+    sum += digit;
+    isEven = !isEven;
+  }
+  
+  return sum % 10 === 0;
+};
+
 export default function PaymentScreen() {
   const router = useRouter();
   const { language, t } = useLanguageStore();
@@ -41,12 +108,17 @@ export default function PaymentScreen() {
   const [currentPaymentIntentId, setCurrentPaymentIntentId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   
-  // Card input state for web
+  // Card input state - TEMPORARY only for UI, sent directly to Stripe
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvc, setCvc] = useState('');
   const [cardholderName, setCardholderName] = useState('');
   const [showCardForm, setShowCardForm] = useState(false);
+  const [cardType, setCardType] = useState<{ type: string; icon: string; color: string } | null>(null);
+  const [cardError, setCardError] = useState<string | null>(null);
+  
+  // Refs for stripe instance
+  const stripeRef = useRef<any>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -60,6 +132,13 @@ export default function PaymentScreen() {
     return () => clearTimeout(timer);
   }, [selectedApp, termsAccepted]);
 
+  // Detect card type when card number changes
+  useEffect(() => {
+    const detected = detectCardType(cardNumber);
+    setCardType(detected);
+    setCardError(null);
+  }, [cardNumber]);
+
   const initializePayment = async () => {
     if (!selectedApp) return;
     
@@ -72,6 +151,9 @@ export default function PaymentScreen() {
       setCurrentPaymentIntentId(paymentData.payment_intent_id);
       setClientSecret(paymentData.client_secret);
       setPaymentStatus('ready');
+      
+      // Pre-load Stripe.js
+      await loadStripeJs();
     } catch (error: any) {
       console.error('Payment initialization error:', error);
       setPaymentStatus('failed');
@@ -84,79 +166,7 @@ export default function PaymentScreen() {
     }
   };
 
-  const handleOpenStripeCheckout = async () => {
-    if (!clientSecret) {
-      Alert.alert(
-        language === 'en' ? 'Please Wait' : 'Por Favor Espere',
-        language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
-      );
-      return;
-    }
-
-    // For web, we'll use Stripe.js via script or redirect to Stripe Checkout
-    if (Platform.OS === 'web') {
-      setShowCardForm(true);
-      return;
-    }
-
-    // For native apps, this would use the PaymentSheet
-    // Since we can't import the native module here, we simulate
-    setPaymentStatus('processing');
-    handleCardPayment();
-  };
-
-  const handleCardPayment = async () => {
-    if (!clientSecret || !currentPaymentIntentId) return;
-    
-    setPaymentStatus('processing');
-
-    try {
-      // For web: Use Stripe.js directly
-      if (Platform.OS === 'web') {
-        // Load Stripe.js
-        const stripeJs = await loadStripeJs();
-        if (!stripeJs) {
-          throw new Error('Failed to load Stripe');
-        }
-
-        // Confirm the payment with Stripe
-        const { error, paymentIntent } = await stripeJs.confirmCardPayment(clientSecret, {
-          payment_method: {
-            card: {
-              // In production, this would use Stripe Elements
-              // For now, we'll use the card data from the form
-            },
-            billing_details: {
-              name: cardholderName || 'Customer',
-            },
-          },
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        if (paymentIntent?.status === 'succeeded') {
-          await completePayment();
-        } else {
-          throw new Error('Payment not completed');
-        }
-      }
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      setPaymentStatus('failed');
-      Alert.alert(
-        t('payment.failed'),
-        error.message || t('payment.tryAgain'),
-        [{ text: 'OK', onPress: () => {
-          setPaymentStatus('ready');
-          setShowCardForm(false);
-        }}]
-      );
-    }
-  };
-
-  // Load Stripe.js for web
+  // Load Stripe.js for web - card data goes DIRECTLY to Stripe, never stored in app
   const loadStripeJs = (): Promise<any> => {
     return new Promise((resolve) => {
       if (Platform.OS !== 'web') {
@@ -164,68 +174,137 @@ export default function PaymentScreen() {
         return;
       }
 
-      // Check if Stripe is already loaded
-      if ((window as any).Stripe) {
-        resolve((window as any).Stripe(STRIPE_PUBLISHABLE_KEY));
+      if (stripeRef.current) {
+        resolve(stripeRef.current);
         return;
       }
 
-      // Load Stripe.js script
+      if ((window as any).Stripe) {
+        stripeRef.current = (window as any).Stripe(STRIPE_PUBLISHABLE_KEY);
+        resolve(stripeRef.current);
+        return;
+      }
+
       const script = document.createElement('script');
       script.src = 'https://js.stripe.com/v3/';
       script.onload = () => {
-        resolve((window as any).Stripe(STRIPE_PUBLISHABLE_KEY));
+        stripeRef.current = (window as any).Stripe(STRIPE_PUBLISHABLE_KEY);
+        resolve(stripeRef.current);
       };
-      script.onerror = () => {
-        resolve(null);
-      };
+      script.onerror = () => resolve(null);
       document.head.appendChild(script);
     });
   };
 
-  const handleWebPayment = async () => {
+  const handleOpenPaymentForm = () => {
+    if (!clientSecret) {
+      Alert.alert(
+        language === 'en' ? 'Please Wait' : 'Por Favor Espere',
+        language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
+      );
+      return;
+    }
+    setShowCardForm(true);
+  };
+
+  const handlePayNow = async () => {
     if (!clientSecret || !currentPaymentIntentId) return;
     
+    // Validate card number
+    const cleanCardNumber = cardNumber.replace(/\s/g, '');
+    if (!isValidCardNumber(cleanCardNumber)) {
+      setCardError(language === 'en' ? 'Invalid card number' : 'Número de tarjeta inválido');
+      return;
+    }
+    
+    // Validate expiry
+    const [expMonth, expYear] = expiryDate.split('/').map(s => s.trim());
+    if (!expMonth || !expYear || parseInt(expMonth) < 1 || parseInt(expMonth) > 12) {
+      setCardError(language === 'en' ? 'Invalid expiry date' : 'Fecha de vencimiento inválida');
+      return;
+    }
+    
+    // Validate CVC
+    const cvcLength = cardType?.type === 'AMEX' ? 4 : 3;
+    if (cvc.length < cvcLength) {
+      setCardError(language === 'en' ? 'Invalid CVC' : 'CVC inválido');
+      return;
+    }
+
     setPaymentStatus('processing');
+    setCardError(null);
 
     try {
-      // Load Stripe.js
       const stripeJs = await loadStripeJs();
       if (!stripeJs) {
-        throw new Error(language === 'en' ? 'Failed to load payment system' : 'Error al cargar el sistema de pago');
+        throw new Error(language === 'en' ? 'Payment system not available' : 'Sistema de pago no disponible');
       }
 
-      // Open Stripe Checkout in a new window for better compatibility
-      const checkoutUrl = `https://checkout.stripe.com/pay/${currentPaymentIntentId}`;
-      
-      // For web, we'll redirect to complete payment
-      // Or use Stripe Elements inline
-      
-      // Verify payment after user returns
-      const result = await confirmPayment(currentPaymentIntentId);
-      
-      if (result.status === 'succeeded') {
+      // Create payment method - card data sent DIRECTLY to Stripe's servers
+      // Data is NOT stored in our app or backend
+      const { error: pmError, paymentMethod } = await stripeJs.createPaymentMethod({
+        type: 'card',
+        card: {
+          number: cleanCardNumber,
+          exp_month: parseInt(expMonth, 10),
+          exp_year: parseInt(expYear.length === 2 ? `20${expYear}` : expYear, 10),
+          cvc: cvc,
+        },
+        billing_details: {
+          name: cardholderName || undefined,
+        },
+      });
+
+      if (pmError) {
+        throw pmError;
+      }
+
+      // IMPORTANT: Clear card data from memory immediately after sending to Stripe
+      setCardNumber('');
+      setExpiryDate('');
+      setCvc('');
+      setCardholderName('');
+
+      // Confirm the payment with Stripe using the secure payment method
+      const { error, paymentIntent } = await stripeJs.confirmCardPayment(clientSecret, {
+        payment_method: paymentMethod.id,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (paymentIntent?.status === 'succeeded') {
+        // Verify with our backend (only sends payment_intent_id, NOT card data)
+        await confirmPayment(currentPaymentIntentId);
         await completePayment();
-      } else if (result.status === 'requires_payment_method') {
-        // Payment not yet made - this is expected before user pays
-        // We need to use Stripe Elements or redirect
-        openStripePaymentLink();
+      } else if (paymentIntent?.status === 'requires_action') {
+        // 3D Secure authentication required - Stripe handles this automatically
+        Alert.alert(
+          language === 'en' ? 'Authentication Required' : 'Autenticación Requerida',
+          language === 'en' 
+            ? 'Please complete the authentication in the popup window' 
+            : 'Por favor complete la autenticación en la ventana emergente'
+        );
       } else {
         throw new Error(language === 'en' ? 'Payment not completed' : 'Pago no completado');
       }
     } catch (error: any) {
       console.error('Payment error:', error);
-      // If payment requires action, open Stripe link
-      openStripePaymentLink();
+      setPaymentStatus('failed');
+      
+      // Clear sensitive data on error too
+      setCvc('');
+      
+      const errorMessage = error.message || error.decline_code || t('payment.tryAgain');
+      setCardError(errorMessage);
+      
+      Alert.alert(
+        t('payment.failed'),
+        errorMessage,
+        [{ text: 'OK', onPress: () => setPaymentStatus('ready') }]
+      );
     }
-  };
-
-  const openStripePaymentLink = () => {
-    // For web, we'll open Stripe's hosted payment page
-    // This requires setting up a Checkout Session on the backend
-    // For now, show the card form
-    setShowCardForm(true);
-    setPaymentStatus('ready');
   };
 
   const completePayment = async () => {
@@ -236,7 +315,6 @@ export default function PaymentScreen() {
       setPaymentIntentId(currentPaymentIntentId);
       setPaymentComplete(true);
       
-      // Load the content after confirmed payment
       const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
         getZipCodesByApp(selectedApp!),
         getGuidesByApp(selectedApp!),
@@ -247,92 +325,32 @@ export default function PaymentScreen() {
       setGuides(guidesData);
       setVoiceGuides(voiceGuidesData);
 
-      // Navigate to results after short delay
       setTimeout(() => {
         router.replace('/results');
       }, 2500);
     } catch (error) {
       console.error('Error loading content:', error);
-      // Still navigate - payment was successful
       setTimeout(() => {
         router.replace('/results');
       }, 2500);
     }
   };
 
-  const handlePayNow = async () => {
-    if (!clientSecret || !currentPaymentIntentId) {
-      Alert.alert(
-        language === 'en' ? 'Please Wait' : 'Por Favor Espere',
-        language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
-      );
-      return;
-    }
-
-    setPaymentStatus('processing');
-
-    try {
-      // Load Stripe.js
-      const stripeJs = await loadStripeJs();
-      if (!stripeJs) {
-        throw new Error('Stripe not loaded');
-      }
-
-      // Parse expiry date
-      const [expMonth, expYear] = expiryDate.split('/').map(s => s.trim());
-      
-      // Create payment method
-      const { error: pmError, paymentMethod } = await stripeJs.createPaymentMethod({
-        type: 'card',
-        card: {
-          number: cardNumber.replace(/\s/g, ''),
-          exp_month: parseInt(expMonth, 10),
-          exp_year: parseInt(expYear.length === 2 ? `20${expYear}` : expYear, 10),
-          cvc: cvc,
-        },
-        billing_details: {
-          name: cardholderName || 'Customer',
-        },
-      });
-
-      if (pmError) {
-        throw pmError;
-      }
-
-      // Confirm the payment
-      const { error, paymentIntent } = await stripeJs.confirmCardPayment(clientSecret, {
-        payment_method: paymentMethod.id,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (paymentIntent?.status === 'succeeded') {
-        // Verify with backend
-        await confirmPayment(currentPaymentIntentId);
-        await completePayment();
-      } else if (paymentIntent?.status === 'requires_action') {
-        // 3D Secure or other action required - Stripe will handle this
-        throw new Error(language === 'en' ? 'Additional verification required' : 'Se requiere verificación adicional');
-      } else {
-        throw new Error(language === 'en' ? 'Payment not completed' : 'Pago no completado');
-      }
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      setPaymentStatus('failed');
-      Alert.alert(
-        t('payment.failed'),
-        error.message || t('payment.tryAgain'),
-        [{ text: 'OK', onPress: () => setPaymentStatus('ready') }]
-      );
-    }
-  };
-
   const formatCardNumber = (text: string) => {
     const cleaned = text.replace(/\D/g, '');
-    const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-    return formatted.substring(0, 19); // 16 digits + 3 spaces
+    const isAmex = /^3[47]/.test(cleaned);
+    
+    if (isAmex) {
+      // AMEX format: XXXX XXXXXX XXXXX
+      const part1 = cleaned.substring(0, 4);
+      const part2 = cleaned.substring(4, 10);
+      const part3 = cleaned.substring(10, 15);
+      return [part1, part2, part3].filter(Boolean).join(' ');
+    } else {
+      // Standard format: XXXX XXXX XXXX XXXX
+      const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
+      return formatted.substring(0, 19);
+    }
   };
 
   const formatExpiryDate = (text: string) => {
@@ -359,6 +377,10 @@ export default function PaymentScreen() {
       case 'instacart': return '#4CAF50';
       default: return COLORS.accent;
     }
+  };
+
+  const getMaxCvcLength = () => {
+    return cardType?.type === 'AMEX' ? 4 : 3;
   };
 
   if (isChecking) {
@@ -438,42 +460,63 @@ export default function PaymentScreen() {
             </View>
           </View>
 
-          {/* Card Form (for web) */}
+          {/* Card Form */}
           {showCardForm && (
             <View style={styles.cardFormContainer}>
-              <Text style={styles.cardFormTitle}>
-                {language === 'en' ? 'Enter Card Details' : 'Ingrese los Datos de la Tarjeta'}
-              </Text>
-              
+              <View style={styles.cardFormHeader}>
+                <Text style={styles.cardFormTitle}>
+                  {language === 'en' ? 'Card Details' : 'Datos de Tarjeta'}
+                </Text>
+                <View style={styles.secureIndicator}>
+                  <Ionicons name="lock-closed" size={14} color={COLORS.success} />
+                  <Text style={styles.secureText}>
+                    {language === 'en' ? 'Secure' : 'Seguro'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Cardholder Name */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
                   {language === 'en' ? 'Cardholder Name' : 'Nombre del Titular'}
                 </Text>
                 <TextInput
                   style={styles.input}
-                  placeholder={language === 'en' ? 'John Doe' : 'Juan Pérez'}
+                  placeholder={language === 'en' ? 'JOHN DOE' : 'JUAN PÉREZ'}
                   placeholderTextColor={COLORS.textMuted}
                   value={cardholderName}
                   onChangeText={setCardholderName}
-                  autoCapitalize="words"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
                 />
               </View>
 
+              {/* Card Number with Type Detection */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
                   {language === 'en' ? 'Card Number' : 'Número de Tarjeta'}
                 </Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="4242 4242 4242 4242"
-                  placeholderTextColor={COLORS.textMuted}
-                  value={cardNumber}
-                  onChangeText={(text) => setCardNumber(formatCardNumber(text))}
-                  keyboardType="numeric"
-                  maxLength={19}
-                />
+                <View style={styles.cardInputContainer}>
+                  <TextInput
+                    style={[styles.input, styles.cardInput]}
+                    placeholder="0000 0000 0000 0000"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={cardNumber}
+                    onChangeText={(text) => setCardNumber(formatCardNumber(text))}
+                    keyboardType="numeric"
+                    maxLength={cardType?.type === 'AMEX' ? 17 : 19}
+                    autoCorrect={false}
+                  />
+                  {/* Card Type Indicator */}
+                  {cardType && (
+                    <View style={[styles.cardTypeIndicator, { backgroundColor: cardType.color }]}>
+                      <Text style={styles.cardTypeText}>{cardType.type}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
 
+              {/* Expiry and CVC Row */}
               <View style={styles.inputRow}>
                 <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
                   <Text style={styles.inputLabel}>
@@ -487,29 +530,52 @@ export default function PaymentScreen() {
                     onChangeText={(text) => setExpiryDate(formatExpiryDate(text))}
                     keyboardType="numeric"
                     maxLength={5}
+                    autoCorrect={false}
                   />
                 </View>
 
                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.inputLabel}>CVC</Text>
+                  <Text style={styles.inputLabel}>
+                    CVC {cardType?.type === 'AMEX' ? '(4 digits)' : '(3 digits)'}
+                  </Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="123"
+                    placeholder={cardType?.type === 'AMEX' ? '0000' : '000'}
                     placeholderTextColor={COLORS.textMuted}
                     value={cvc}
                     onChangeText={setCvc}
                     keyboardType="numeric"
-                    maxLength={4}
+                    maxLength={getMaxCvcLength()}
                     secureTextEntry
+                    autoCorrect={false}
                   />
                 </View>
+              </View>
+
+              {/* Error Message */}
+              {cardError && (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+                  <Text style={styles.errorText}>{cardError}</Text>
+                </View>
+              )}
+
+              {/* Security Notice */}
+              <View style={styles.securityNotice}>
+                <Ionicons name="shield-checkmark" size={16} color={COLORS.textMuted} />
+                <Text style={styles.securityNoticeText}>
+                  {language === 'en' 
+                    ? 'Your card data is sent directly to Stripe and is never stored in this app.' 
+                    : 'Los datos de su tarjeta se envían directamente a Stripe y nunca se guardan en esta app.'}
+                </Text>
               </View>
 
               {/* Pay Now Button */}
               <TouchableOpacity
                 style={[
                   styles.payButton, 
-                  paymentStatus === 'processing' && styles.payButtonDisabled
+                  paymentStatus === 'processing' && styles.payButtonDisabled,
+                  (!cardNumber || !expiryDate || !cvc) && styles.payButtonDisabled
                 ]}
                 onPress={handlePayNow}
                 disabled={paymentStatus === 'processing' || !cardNumber || !expiryDate || !cvc}
@@ -523,7 +589,7 @@ export default function PaymentScreen() {
                   <>
                     <Ionicons name="lock-closed" size={20} color="#fff" />
                     <Text style={styles.payButtonText}>
-                      {language === 'en' ? 'Pay $5.00 Now' : 'Pagar $5.00 Ahora'}
+                      {language === 'en' ? 'Pay $5.00 Securely' : 'Pagar $5.00 de Forma Segura'}
                     </Text>
                   </>
                 )}
@@ -532,7 +598,15 @@ export default function PaymentScreen() {
               {/* Cancel Button */}
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setShowCardForm(false)}
+                onPress={() => {
+                  // Clear all card data when canceling
+                  setCardNumber('');
+                  setExpiryDate('');
+                  setCvc('');
+                  setCardholderName('');
+                  setCardError(null);
+                  setShowCardForm(false);
+                }}
               >
                 <Text style={styles.cancelButtonText}>
                   {language === 'en' ? 'Cancel' : 'Cancelar'}
@@ -550,8 +624,8 @@ export default function PaymentScreen() {
                   <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
                   <Text style={styles.readyNoticeText}>
                     {language === 'en' 
-                      ? 'Ready to pay - Tap the button below to enter your card details' 
-                      : 'Listo para pagar - Toque el botón para ingresar los datos de su tarjeta'}
+                      ? 'Ready to pay - Tap the button below' 
+                      : 'Listo para pagar - Toque el botón'}
                   </Text>
                 </View>
               )}
@@ -580,7 +654,7 @@ export default function PaymentScreen() {
                   styles.payButton, 
                   (paymentStatus === 'loading' || paymentStatus === 'failed') && styles.payButtonDisabled
                 ]}
-                onPress={handleOpenStripeCheckout}
+                onPress={handleOpenPaymentForm}
                 disabled={paymentStatus === 'loading'}
               >
                 {paymentStatus === 'loading' ? (
@@ -602,32 +676,37 @@ export default function PaymentScreen() {
             </>
           )}
 
-          {/* Payment Methods */}
-          <View style={styles.paymentMethods}>
-            <View style={styles.paymentMethodItem}>
-              <Ionicons name="card-outline" size={28} color={COLORS.textMuted} />
-            </View>
-            <View style={styles.paymentMethodItem}>
-              <Text style={styles.paymentMethodText}>VISA</Text>
-            </View>
-            <View style={styles.paymentMethodItem}>
-              <Text style={styles.paymentMethodText}>MC</Text>
-            </View>
-            <View style={styles.paymentMethodItem}>
-              <Text style={styles.paymentMethodText}>AMEX</Text>
+          {/* Supported Cards */}
+          <View style={styles.supportedCards}>
+            <Text style={styles.supportedCardsTitle}>
+              {language === 'en' ? 'Accepted Cards' : 'Tarjetas Aceptadas'}
+            </Text>
+            <View style={styles.cardLogos}>
+              <View style={[styles.cardLogo, { backgroundColor: '#1A1F71' }]}>
+                <Text style={styles.cardLogoText}>VISA</Text>
+              </View>
+              <View style={[styles.cardLogo, { backgroundColor: '#EB001B' }]}>
+                <Text style={styles.cardLogoText}>MC</Text>
+              </View>
+              <View style={[styles.cardLogo, { backgroundColor: '#006FCF' }]}>
+                <Text style={styles.cardLogoText}>AMEX</Text>
+              </View>
+              <View style={[styles.cardLogo, { backgroundColor: '#FF6000' }]}>
+                <Text style={styles.cardLogoText}>DISC</Text>
+              </View>
             </View>
           </View>
 
           {/* Stripe Logo */}
           <View style={styles.stripeInfo}>
             <Text style={styles.stripeText}>
-              {language === 'en' ? 'Secure payments by' : 'Pagos seguros por'} 
+              {language === 'en' ? 'Powered by' : 'Procesado por'} 
             </Text>
             <Text style={styles.stripeBrand}>Stripe</Text>
           </View>
 
           {/* Retry Button if failed */}
-          {paymentStatus === 'failed' && (
+          {paymentStatus === 'failed' && !showCardForm && (
             <TouchableOpacity
               style={styles.retryButton}
               onPress={initializePayment}
@@ -754,23 +833,43 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: COLORS.accent,
+  },
+  cardFormHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   cardFormTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
-    marginBottom: 20,
-    textAlign: 'center',
+  },
+  secureIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${COLORS.success}20`,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  secureText: {
+    fontSize: 12,
+    color: COLORS.success,
+    marginLeft: 4,
+    fontWeight: '600',
   },
   inputGroup: {
     marginBottom: 16,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: COLORS.textSecondary,
     marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   input: {
     backgroundColor: COLORS.background,
@@ -780,9 +879,59 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     borderWidth: 1,
     borderColor: COLORS.primaryLight,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  cardInputContainer: {
+    position: 'relative',
+  },
+  cardInput: {
+    paddingRight: 80,
+  },
+  cardTypeIndicator: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    marginTop: -12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  cardTypeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   inputRow: {
     flexDirection: 'row',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${COLORS.error}15`,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 13,
+    marginLeft: 8,
+    flex: 1,
+  },
+  securityNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: COLORS.background,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  securityNoticeText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 16,
   },
   readyNotice: {
     flexDirection: 'row',
@@ -863,25 +1012,28 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 14,
   },
-  paymentMethods: {
-    flexDirection: 'row',
+  supportedCards: {
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 20,
-    gap: 16,
   },
-  paymentMethodItem: {
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.primaryLight,
-  },
-  paymentMethodText: {
+  supportedCardsTitle: {
     fontSize: 12,
-    fontWeight: 'bold',
     color: COLORS.textMuted,
+    marginBottom: 10,
+  },
+  cardLogos: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cardLogo: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  cardLogoText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   stripeInfo: {
     flexDirection: 'row',
