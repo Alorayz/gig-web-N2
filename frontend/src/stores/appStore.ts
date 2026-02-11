@@ -13,6 +13,7 @@ interface AppState {
   userId: string;
   paidApps: string[];
   lastSessionId: string | null;
+  isHydrated: boolean;
   
   setSelectedApp: (app: string | null) => void;
   setTermsAccepted: (accepted: boolean) => void;
@@ -25,6 +26,7 @@ interface AppState {
   addPaidApp: (app: string) => void;
   isAppPaid: (app: string) => boolean;
   setLastSessionId: (id: string | null) => void;
+  setHydrated: (hydrated: boolean) => void;
   reset: () => void;
   resetForNewPurchase: () => void;
 }
@@ -32,11 +34,6 @@ interface AppState {
 // Generate a unique user ID
 const generateUserId = () => {
   return 'user_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-};
-
-// Get or create user ID
-const getOrCreateUserId = () => {
-  return generateUserId();
 };
 
 export const useAppStore = create<AppState>()(
@@ -49,9 +46,10 @@ export const useAppStore = create<AppState>()(
       zipCodes: [],
       guides: [],
       voiceGuides: [],
-      userId: getOrCreateUserId(),
+      userId: '', // Will be set on first hydration or generated if empty
       paidApps: [],
       lastSessionId: null,
+      isHydrated: false,
       
       setSelectedApp: (app) => set({ selectedApp: app }),
       setTermsAccepted: (accepted) => set({ termsAccepted: accepted }),
@@ -75,10 +73,10 @@ export const useAppStore = create<AppState>()(
       },
       isAppPaid: (app) => {
         const isPaid = get().paidApps.includes(app.toLowerCase());
-        console.log('Checking if app is paid:', app, isPaid);
         return isPaid;
       },
       setLastSessionId: (id) => set({ lastSessionId: id }),
+      setHydrated: (hydrated) => set({ isHydrated: hydrated }),
       reset: () => set({ 
         selectedApp: null, 
         termsAccepted: false, 
@@ -109,9 +107,36 @@ export const useAppStore = create<AppState>()(
         paidApps: state.paidApps,
         lastSessionId: state.lastSessionId,
       }),
-      onRehydrateStorage: () => (state) => {
-        console.log('Storage rehydrated:', state?.paidApps);
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.log('Error rehydrating storage:', error);
+          return;
+        }
+        
+        console.log('Storage rehydrated - userId:', state?.userId, 'paidApps:', state?.paidApps);
+        
+        // If no userId exists after rehydration, generate one
+        if (!state?.userId) {
+          const newUserId = generateUserId();
+          console.log('Generated new userId:', newUserId);
+          useAppStore.setState({ userId: newUserId, isHydrated: true });
+        } else {
+          useAppStore.setState({ isHydrated: true });
+        }
       },
     }
   )
 );
+
+// Initialize userId if not set (for first run)
+const initializeUserId = () => {
+  const state = useAppStore.getState();
+  if (!state.userId) {
+    const newUserId = generateUserId();
+    console.log('Initial userId generation:', newUserId);
+    useAppStore.setState({ userId: newUserId });
+  }
+};
+
+// Call this after a short delay to ensure hydration has happened
+setTimeout(initializeUserId, 100);
