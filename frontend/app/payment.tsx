@@ -23,6 +23,7 @@ export default function PaymentScreen() {
     selectedApp, 
     termsAccepted, 
     userId,
+    deviceId,
     setPaymentComplete,
     setPaymentIntentId,
     setZipCodes,
@@ -31,7 +32,11 @@ export default function PaymentScreen() {
     addPaidApp,
     lastSessionId,
     setLastSessionId,
+    resetForNewPurchase,
   } = useAppStore();
+  
+  // Use userId or fallback to deviceId
+  const userIdToUse = userId || deviceId;
   
   const [isChecking, setIsChecking] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
