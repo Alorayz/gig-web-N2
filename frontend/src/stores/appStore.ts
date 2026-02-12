@@ -43,6 +43,9 @@ interface AppState {
   resetForNewPurchase: () => void;
 }
 
+// 48 hours in milliseconds
+const PURCHASE_VALIDITY_MS = 48 * 60 * 60 * 1000;
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -55,7 +58,9 @@ export const useAppStore = create<AppState>()(
       voiceGuides: [],
       deviceId: '',
       paidApps: [],
+      paidAppsInfo: [],
       lastSessionId: null,
+      isHydrated: false,
       
       setSelectedApp: (app) => set({ selectedApp: app }),
       setTermsAccepted: (accepted) => set({ termsAccepted: accepted }),
@@ -67,17 +72,58 @@ export const useAppStore = create<AppState>()(
       setPaidApps: (apps) => set({ paidApps: apps }),
       addPaidApp: (app) => {
         const currentPaidApps = get().paidApps || [];
+        const currentPaidAppsInfo = get().paidAppsInfo || [];
         const appLower = app.toLowerCase();
+        const now = Date.now();
+        
+        // Add to simple list for backward compatibility
         if (!currentPaidApps.includes(appLower)) {
           set({ paidApps: [...currentPaidApps, appLower] });
+        }
+        
+        // Add or update expiration info
+        const existingIndex = currentPaidAppsInfo.findIndex(p => p.appName === appLower);
+        const newPaidAppInfo: PaidAppInfo = {
+          appName: appLower,
+          purchasedAt: now,
+          expiresAt: now + PURCHASE_VALIDITY_MS,
+        };
+        
+        if (existingIndex >= 0) {
+          // Update existing entry with new expiration
+          const updatedInfo = [...currentPaidAppsInfo];
+          updatedInfo[existingIndex] = newPaidAppInfo;
+          set({ paidAppsInfo: updatedInfo });
+        } else {
+          // Add new entry
+          set({ paidAppsInfo: [...currentPaidAppsInfo, newPaidAppInfo] });
         }
       },
       isAppPaid: (app) => {
         const paidApps = get().paidApps || [];
         return paidApps.includes(app.toLowerCase());
       },
+      isAppValid: (app) => {
+        const paidAppsInfo = get().paidAppsInfo || [];
+        const appLower = app.toLowerCase();
+        const appInfo = paidAppsInfo.find(p => p.appName === appLower);
+        
+        if (!appInfo) return false;
+        
+        const now = Date.now();
+        return now < appInfo.expiresAt;
+      },
+      getAppExpiration: (app) => {
+        const paidAppsInfo = get().paidAppsInfo || [];
+        const appLower = app.toLowerCase();
+        const appInfo = paidAppsInfo.find(p => p.appName === appLower);
+        
+        if (!appInfo) return null;
+        return appInfo.expiresAt;
+      },
       setLastSessionId: (id) => set({ lastSessionId: id }),
       setDeviceId: (id) => set({ deviceId: id }),
+      setHydrated: (hydrated) => set({ isHydrated: hydrated }),
       reset: () => set({ 
         selectedApp: null, 
         termsAccepted: false, 
@@ -100,13 +146,26 @@ export const useAppStore = create<AppState>()(
       }),
     }),
     {
-      name: 'gig-zipfinder-storage-v2',
+      name: 'gig-zipfinder-storage-v3', // Updated version
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         deviceId: state.deviceId,
         paidApps: state.paidApps,
+        paidAppsInfo: state.paidAppsInfo,
         lastSessionId: state.lastSessionId,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHydrated(true);
+          // Generate device ID if not present
+          if (!state.deviceId || state.deviceId.length === 0) {
+            Crypto.getRandomBytesAsync(16).then((randomBytes) => {
+              const newId = 'device_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 24);
+              state.setDeviceId(newId);
+            });
+          }
+        }
+      },
     }
   )
 );
