@@ -232,8 +232,8 @@ export default function HomeScreen() {
   const validPaidApps = paidAppsInfo.filter(info => isAppValid(info.appName));
   const expiredApps = paidAppsInfo.filter(info => !isAppValid(info.appName));
 
-  // Show loading while hydrating
-  if (!isHydrated) {
+  // Show loading while initializing
+  if (!isInitialized) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
