@@ -140,4 +140,16 @@ export const adminLogout = async (token: string) => {
   return response.data;
 };
 
+export const rotateZipCodes = async (token: string) => {
+  const response = await api.post('/admin/rotate-zip-codes', null, {
+    headers: { Authorization: token },
+  });
+  return response.data;
+};
+
+export const checkRotationStatus = async () => {
+  const response = await api.get('/admin/check-rotation');
+  return response.data;
+};
+
 export default api;
