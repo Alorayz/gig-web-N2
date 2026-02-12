@@ -806,4 +806,48 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
+  rotationCard: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  rotationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  rotationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginLeft: 8,
+  },
+  rotationInfo: {
+    marginBottom: 12,
+  },
+  rotationText: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 4,
+  },
+  rotateButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  rotateButtonDisabled: {
+    opacity: 0.6,
+  },
+  rotateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
 });
