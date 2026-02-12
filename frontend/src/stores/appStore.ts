@@ -3,6 +3,13 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 
+// Interface for paid app with expiration
+interface PaidAppInfo {
+  appName: string;
+  purchasedAt: number; // timestamp
+  expiresAt: number; // timestamp (48 hours after purchase)
+}
+
 interface AppState {
   selectedApp: string | null;
   termsAccepted: boolean;
@@ -12,8 +19,10 @@ interface AppState {
   guides: any[];
   voiceGuides: any[];
   deviceId: string;
-  paidApps: string[];
+  paidApps: string[]; // Keep for backward compatibility
+  paidAppsInfo: PaidAppInfo[]; // New: paid apps with expiration info
   lastSessionId: string | null;
+  isHydrated: boolean;
   
   setSelectedApp: (app: string | null) => void;
   setTermsAccepted: (accepted: boolean) => void;
@@ -25,8 +34,11 @@ interface AppState {
   setPaidApps: (apps: string[]) => void;
   addPaidApp: (app: string) => void;
   isAppPaid: (app: string) => boolean;
+  isAppValid: (app: string) => boolean; // New: check if app is paid AND not expired
+  getAppExpiration: (app: string) => number | null; // New: get expiration timestamp
   setLastSessionId: (id: string | null) => void;
   setDeviceId: (id: string) => void;
+  setHydrated: (hydrated: boolean) => void;
   reset: () => void;
   resetForNewPurchase: () => void;
 }
