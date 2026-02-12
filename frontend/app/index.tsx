@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,86 +9,26 @@ import {
   Modal,
   Dimensions,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
-import { useAppStore, getDeviceId } from '../src/stores/appStore';
-import { seedData, getPaidApps, getZipCodesByApp, getGuidesByApp, verifyCheckoutSession } from '../src/services/api';
+import { useAppStore } from '../src/stores/appStore';
+import { seedData } from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguageStore();
-  const { 
-    resetForNewPurchase, 
-    deviceId,
-    userId,
-    paidAppsInfo,
-    setPaidApps,
-    setSelectedApp,
-    setPaymentComplete,
-    setZipCodes,
-    setGuides,
-    setVoiceGuides,
-    lastSessionId,
-    setLastSessionId,
-    addPaidApp,
-    isAppValid,
-    getRemainingTime,
-    setDeviceId,
-    setUserId,
-  } = useAppStore();
+  const { resetForNewPurchase } = useAppStore();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [isLoadingPaidApps, setIsLoadingPaidApps] = useState(true);
-  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState<{[key: string]: string}>({});
-  const [isInitialized, setIsInitialized] = useState(true); // Start as initialized
-  const [currentUserId, setCurrentUserId] = useState<string>('');
-
-  // Initialize user ID on mount
-  useEffect(() => {
-    const initUserId = async () => {
-      try {
-        const id = await getDeviceId();
-        setCurrentUserId(id);
-      } catch (error) {
-        console.error('Error getting device ID:', error);
-        // Generate a fallback ID
-        const fallbackId = 'device_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-        setCurrentUserId(fallbackId);
-      }
-    };
-    initUserId();
-  }, []);
-
-  // Update countdown timer every minute
-  useEffect(() => {
-    const updateTimers = () => {
-      const newTimeRemaining: {[key: string]: string} = {};
-      paidAppsInfo.forEach((info) => {
-        newTimeRemaining[info.appName] = getRemainingTime(info.appName);
-      });
-      setTimeRemaining(newTimeRemaining);
-    };
-
-    updateTimers();
-    const interval = setInterval(updateTimers, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, [paidAppsInfo]);
 
   useEffect(() => {
-    if (!isInitialized) return;
-    
     resetForNewPurchase();
     initializeData();
-    loadPaidApps();
-    checkPendingPayment();
-  }, [isInitialized, currentUserId]);
+  }, []);
 
   const initializeData = async () => {
     try {
@@ -101,139 +41,13 @@ export default function HomeScreen() {
     }
   };
 
-  const loadPaidApps = async () => {
-    if (!currentUserId) return;
-    
-    try {
-      setIsLoadingPaidApps(true);
-      const result = await getPaidApps(currentUserId);
-      if (result.paid_apps && result.paid_apps.length > 0) {
-        setPaidApps(result.paid_apps);
-      }
-    } catch (error) {
-      console.log('Error loading paid apps:', error);
-    } finally {
-      setIsLoadingPaidApps(false);
-    }
-  };
-
-  // Check if there's a pending payment to verify
-  const checkPendingPayment = async () => {
-    if (!lastSessionId) return;
-    
-    setIsCheckingPayment(true);
-    try {
-      const result = await verifyCheckoutSession(lastSessionId);
-      if (result.status === 'succeeded' && result.app_name) {
-        // Payment was successful!
-        addPaidApp(result.app_name);
-        setLastSessionId(null); // Clear the pending session
-        
-        // Reload paid apps from server
-        if (currentUserId) {
-          const paidResult = await getPaidApps(currentUserId);
-          if (paidResult.paid_apps && paidResult.paid_apps.length > 0) {
-            setPaidApps(paidResult.paid_apps);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('Error checking pending payment:', error);
-    } finally {
-      setIsCheckingPayment(false);
-    }
-  };
-
   const handleGetStarted = () => {
     router.push('/select-app');
-  };
-
-  const handleAccessPaidApp = async (appName: string) => {
-    // Check if app is still valid (not expired)
-    if (!isAppValid(appName)) {
-      Alert.alert(
-        language === 'en' ? 'Access Expired' : 'Acceso Expirado',
-        language === 'en' 
-          ? 'Your 48-hour access has expired. Please purchase again to access this content.'
-          : 'Tu acceso de 48 horas ha expirado. Por favor compra de nuevo para acceder a este contenido.',
-        [
-          { 
-            text: language === 'en' ? 'Buy Again' : 'Comprar de Nuevo', 
-            onPress: () => {
-              setSelectedApp(appName);
-              router.push('/terms');
-            }
-          },
-          { text: 'OK', style: 'cancel' }
-        ]
-      );
-      return;
-    }
-
-    try {
-      setSelectedApp(appName);
-      setPaymentComplete(true);
-      
-      // Load content for the paid app
-      const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
-        getZipCodesByApp(appName),
-        getGuidesByApp(appName),
-        getGuidesByApp('google_voice'),
-      ]);
-
-      setZipCodes(zipCodesData);
-      setGuides(guidesData);
-      setVoiceGuides(voiceGuidesData);
-
-      router.push('/results');
-    } catch (error) {
-      console.error('Error loading paid app content:', error);
-      Alert.alert(
-        language === 'en' ? 'Error' : 'Error',
-        language === 'en' 
-          ? 'Could not load content. Please try again.'
-          : 'No se pudo cargar el contenido. Por favor intente de nuevo.'
-      );
-    }
   };
 
   const handleAdminAccess = () => {
     router.push('/admin/login');
   };
-
-  const getAppDisplayName = (app: string) => {
-    switch (app.toLowerCase()) {
-      case 'spark': return 'Spark Driver';
-      case 'doordash': return 'DoorDash';
-      case 'instacart': return 'Instacart';
-      default: return app;
-    }
-  };
-
-  const getAppIcon = (app: string) => {
-    switch (app.toLowerCase()) {
-      case 'spark': return 'car';
-      case 'doordash': return 'fast-food';
-      case 'instacart': return 'cart';
-      default: return 'apps';
-    }
-  };
-
-  const getAppColor = (app: string) => {
-    switch (app.toLowerCase()) {
-      case 'spark': return '#FFC107';
-      case 'doordash': return '#FF5722';
-      case 'instacart': return '#4CAF50';
-      default: return COLORS.accent;
-    }
-  };
-
-  // Get valid (not expired) apps
-  const validPaidApps = paidAppsInfo.filter(info => isAppValid(info.appName));
-  const expiredApps = paidAppsInfo.filter(info => !isAppValid(info.appName));
-
-  // Show loading while initializing - removed to avoid infinite loop
-  // The app will render with isInitialized=true from start
 
   return (
     <SafeAreaView style={styles.container}>
@@ -268,81 +82,6 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
-
-        {/* Valid Paid Apps Section - Show if user has valid (not expired) paid apps */}
-        {validPaidApps.length > 0 && (
-          <View style={styles.paidAppsSection}>
-            <View style={styles.paidAppsHeader}>
-              <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
-              <Text style={styles.paidAppsTitle}>
-                {language === 'en' ? 'Your Active Apps' : 'Tus Apps Activas'}
-              </Text>
-            </View>
-            
-            {validPaidApps.map((info) => (
-              <TouchableOpacity
-                key={info.appName}
-                style={[styles.paidAppItem, { borderColor: getAppColor(info.appName) }]}
-                onPress={() => handleAccessPaidApp(info.appName)}
-              >
-                <View style={[styles.paidAppIcon, { backgroundColor: `${getAppColor(info.appName)}20` }]}>
-                  <Ionicons name={getAppIcon(info.appName) as any} size={24} color={getAppColor(info.appName)} />
-                </View>
-                <View style={styles.paidAppInfo}>
-                  <Text style={styles.paidAppName}>{getAppDisplayName(info.appName)}</Text>
-                  <View style={styles.timerContainer}>
-                    <Ionicons name="time" size={14} color={COLORS.warning} />
-                    <Text style={styles.timerText}>
-                      {language === 'en' ? 'Expires in: ' : 'Expira en: '}
-                      {timeRemaining[info.appName] || getRemainingTime(info.appName)}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="arrow-forward-circle" size={28} color={getAppColor(info.appName)} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Expired Apps Section */}
-        {expiredApps.length > 0 && (
-          <View style={styles.expiredAppsSection}>
-            <View style={styles.expiredAppsHeader}>
-              <Ionicons name="time" size={24} color={COLORS.warning} />
-              <Text style={styles.expiredAppsTitle}>
-                {language === 'en' ? 'Expired Access' : 'Acceso Expirado'}
-              </Text>
-            </View>
-            
-            {expiredApps.map((info) => (
-              <View
-                key={info.appName}
-                style={[styles.expiredAppItem]}
-              >
-                <View style={[styles.paidAppIcon, { backgroundColor: `${COLORS.textMuted}20` }]}>
-                  <Ionicons name={getAppIcon(info.appName) as any} size={24} color={COLORS.textMuted} />
-                </View>
-                <View style={styles.paidAppInfo}>
-                  <Text style={[styles.paidAppName, { color: COLORS.textMuted }]}>{getAppDisplayName(info.appName)}</Text>
-                  <Text style={styles.expiredText}>
-                    {language === 'en' ? '48h access expired' : 'Acceso de 48h expirado'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.renewButton}
-                  onPress={() => {
-                    setSelectedApp(info.appName);
-                    router.push('/terms');
-                  }}
-                >
-                  <Text style={styles.renewButtonText}>
-                    {language === 'en' ? 'Renew' : 'Renovar'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
 
         {/* Description */}
         <View style={styles.descriptionContainer}>
@@ -379,8 +118,14 @@ export default function HomeScreen() {
           onPress={handleGetStarted}
           disabled={isSeeding}
         >
-          <Ionicons name="rocket" size={24} color="#fff" />
-          <Text style={styles.mainButtonText}>{t('app.getStarted')}</Text>
+          {isSeeding ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="rocket" size={24} color="#fff" />
+              <Text style={styles.mainButtonText}>{t('app.getStarted')}</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         {/* Price Info */}
@@ -463,16 +208,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: COLORS.textSecondary,
-    fontSize: 16,
   },
   scrollContent: {
     flexGrow: 1,
@@ -567,108 +302,6 @@ const styles = StyleSheet.create({
   featuresContainer: {
     width: '100%',
     marginBottom: 30,
-  },
-  paidAppsSection: {
-    width: '100%',
-    backgroundColor: `${COLORS.success}10`,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: COLORS.success,
-  },
-  paidAppsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  paidAppsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.success,
-    marginLeft: 10,
-  },
-  paidAppItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 2,
-  },
-  paidAppIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  paidAppInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  paidAppName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  timerText: {
-    fontSize: 12,
-    color: COLORS.warning,
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  expiredAppsSection: {
-    width: '100%',
-    backgroundColor: `${COLORS.warning}10`,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: COLORS.warning,
-  },
-  expiredAppsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  expiredAppsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.warning,
-    marginLeft: 10,
-  },
-  expiredAppItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: COLORS.textMuted,
-  },
-  expiredText: {
-    fontSize: 12,
-    color: COLORS.error,
-    marginTop: 2,
-  },
-  renewButton: {
-    backgroundColor: COLORS.warning,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  renewButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   featureItem: {
     flexDirection: 'row',
