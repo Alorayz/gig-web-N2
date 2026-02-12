@@ -102,12 +102,11 @@ export default function HomeScreen() {
   };
 
   const loadPaidApps = async () => {
-    if (!userId && !deviceId) return;
+    if (!currentUserId) return;
     
     try {
       setIsLoadingPaidApps(true);
-      const userIdToUse = userId || deviceId;
-      const result = await getPaidApps(userIdToUse);
+      const result = await getPaidApps(currentUserId);
       if (result.paid_apps && result.paid_apps.length > 0) {
         setPaidApps(result.paid_apps);
       }
@@ -131,9 +130,8 @@ export default function HomeScreen() {
         setLastSessionId(null); // Clear the pending session
         
         // Reload paid apps from server
-        const userIdToUse = userId || deviceId;
-        if (userIdToUse) {
-          const paidResult = await getPaidApps(userIdToUse);
+        if (currentUserId) {
+          const paidResult = await getPaidApps(currentUserId);
           if (paidResult.paid_apps && paidResult.paid_apps.length > 0) {
             setPaidApps(paidResult.paid_apps);
           }
