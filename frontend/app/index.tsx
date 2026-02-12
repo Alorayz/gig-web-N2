@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Modal,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,8 +24,10 @@ export default function HomeScreen() {
   const { language, setLanguage, t } = useLanguageStore();
   const { 
     resetForNewPurchase, 
-    userId, 
+    deviceId,
+    userId,
     paidApps, 
+    paidAppsInfo,
     setPaidApps,
     setSelectedApp,
     setPaymentComplete,
@@ -34,18 +37,41 @@ export default function HomeScreen() {
     lastSessionId,
     setLastSessionId,
     addPaidApp,
+    isAppValid,
+    getRemainingTime,
+    isHydrated,
   } = useAppStore();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isLoadingPaidApps, setIsLoadingPaidApps] = useState(true);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<{[key: string]: string}>({});
+
+  // Update countdown timer every minute
+  useEffect(() => {
+    const updateTimers = () => {
+      const newTimeRemaining: {[key: string]: string} = {};
+      paidAppsInfo.forEach((info) => {
+        newTimeRemaining[info.appName] = getRemainingTime(info.appName);
+      });
+      setTimeRemaining(newTimeRemaining);
+    };
+
+    updateTimers();
+    const interval = setInterval(updateTimers, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [paidAppsInfo]);
 
   useEffect(() => {
+    // Wait for hydration before initializing
+    if (!isHydrated) return;
+    
     resetForNewPurchase();
     initializeData();
     loadPaidApps();
     checkPendingPayment();
-  }, []);
+  }, [isHydrated]);
 
   const initializeData = async () => {
     try {
@@ -59,9 +85,12 @@ export default function HomeScreen() {
   };
 
   const loadPaidApps = async () => {
+    if (!userId && !deviceId) return;
+    
     try {
       setIsLoadingPaidApps(true);
-      const result = await getPaidApps(userId);
+      const userIdToUse = userId || deviceId;
+      const result = await getPaidApps(userIdToUse);
       if (result.paid_apps && result.paid_apps.length > 0) {
         setPaidApps(result.paid_apps);
       }
@@ -85,9 +114,12 @@ export default function HomeScreen() {
         setLastSessionId(null); // Clear the pending session
         
         // Reload paid apps from server
-        const paidResult = await getPaidApps(userId);
-        if (paidResult.paid_apps && paidResult.paid_apps.length > 0) {
-          setPaidApps(paidResult.paid_apps);
+        const userIdToUse = userId || deviceId;
+        if (userIdToUse) {
+          const paidResult = await getPaidApps(userIdToUse);
+          if (paidResult.paid_apps && paidResult.paid_apps.length > 0) {
+            setPaidApps(paidResult.paid_apps);
+          }
         }
       }
     } catch (error) {
@@ -102,6 +134,27 @@ export default function HomeScreen() {
   };
 
   const handleAccessPaidApp = async (appName: string) => {
+    // Check if app is still valid (not expired)
+    if (!isAppValid(appName)) {
+      Alert.alert(
+        language === 'en' ? 'Access Expired' : 'Acceso Expirado',
+        language === 'en' 
+          ? 'Your 48-hour access has expired. Please purchase again to access this content.'
+          : 'Tu acceso de 48 horas ha expirado. Por favor compra de nuevo para acceder a este contenido.',
+        [
+          { 
+            text: language === 'en' ? 'Buy Again' : 'Comprar de Nuevo', 
+            onPress: () => {
+              setSelectedApp(appName);
+              router.push('/terms');
+            }
+          },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
+      return;
+    }
+
     try {
       setSelectedApp(appName);
       setPaymentComplete(true);
@@ -120,6 +173,12 @@ export default function HomeScreen() {
       router.push('/results');
     } catch (error) {
       console.error('Error loading paid app content:', error);
+      Alert.alert(
+        language === 'en' ? 'Error' : 'Error',
+        language === 'en' 
+          ? 'Could not load content. Please try again.'
+          : 'No se pudo cargar el contenido. Por favor intente de nuevo.'
+      );
     }
   };
 
@@ -153,6 +212,24 @@ export default function HomeScreen() {
       default: return COLORS.accent;
     }
   };
+
+  // Get valid (not expired) apps
+  const validPaidApps = paidAppsInfo.filter(info => isAppValid(info.appName));
+  const expiredApps = paidAppsInfo.filter(info => !isAppValid(info.appName));
+
+  // Show loading while hydrating
+  if (!isHydrated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.accent} />
+          <Text style={styles.loadingText}>
+            {language === 'en' ? 'Loading...' : 'Cargando...'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -188,33 +265,77 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Paid Apps Section - Show if user has paid apps */}
-        {paidApps.length > 0 && (
+        {/* Valid Paid Apps Section - Show if user has valid (not expired) paid apps */}
+        {validPaidApps.length > 0 && (
           <View style={styles.paidAppsSection}>
             <View style={styles.paidAppsHeader}>
               <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
               <Text style={styles.paidAppsTitle}>
-                {language === 'en' ? 'Your Purchased Apps' : 'Tus Apps Compradas'}
+                {language === 'en' ? 'Your Active Apps' : 'Tus Apps Activas'}
               </Text>
             </View>
             
-            {paidApps.map((app) => (
+            {validPaidApps.map((info) => (
               <TouchableOpacity
-                key={app}
-                style={[styles.paidAppItem, { borderColor: getAppColor(app) }]}
-                onPress={() => handleAccessPaidApp(app)}
+                key={info.appName}
+                style={[styles.paidAppItem, { borderColor: getAppColor(info.appName) }]}
+                onPress={() => handleAccessPaidApp(info.appName)}
               >
-                <View style={[styles.paidAppIcon, { backgroundColor: `${getAppColor(app)}20` }]}>
-                  <Ionicons name={getAppIcon(app) as any} size={24} color={getAppColor(app)} />
+                <View style={[styles.paidAppIcon, { backgroundColor: `${getAppColor(info.appName)}20` }]}>
+                  <Ionicons name={getAppIcon(info.appName) as any} size={24} color={getAppColor(info.appName)} />
                 </View>
                 <View style={styles.paidAppInfo}>
-                  <Text style={styles.paidAppName}>{getAppDisplayName(app)}</Text>
-                  <Text style={styles.paidAppStatus}>
-                    {language === 'en' ? 'Tap to access' : 'Toca para acceder'}
+                  <Text style={styles.paidAppName}>{getAppDisplayName(info.appName)}</Text>
+                  <View style={styles.timerContainer}>
+                    <Ionicons name="time" size={14} color={COLORS.warning} />
+                    <Text style={styles.timerText}>
+                      {language === 'en' ? 'Expires in: ' : 'Expira en: '}
+                      {timeRemaining[info.appName] || getRemainingTime(info.appName)}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="arrow-forward-circle" size={28} color={getAppColor(info.appName)} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Expired Apps Section */}
+        {expiredApps.length > 0 && (
+          <View style={styles.expiredAppsSection}>
+            <View style={styles.expiredAppsHeader}>
+              <Ionicons name="time" size={24} color={COLORS.warning} />
+              <Text style={styles.expiredAppsTitle}>
+                {language === 'en' ? 'Expired Access' : 'Acceso Expirado'}
+              </Text>
+            </View>
+            
+            {expiredApps.map((info) => (
+              <View
+                key={info.appName}
+                style={[styles.expiredAppItem]}
+              >
+                <View style={[styles.paidAppIcon, { backgroundColor: `${COLORS.textMuted}20` }]}>
+                  <Ionicons name={getAppIcon(info.appName) as any} size={24} color={COLORS.textMuted} />
+                </View>
+                <View style={styles.paidAppInfo}>
+                  <Text style={[styles.paidAppName, { color: COLORS.textMuted }]}>{getAppDisplayName(info.appName)}</Text>
+                  <Text style={styles.expiredText}>
+                    {language === 'en' ? '48h access expired' : 'Acceso de 48h expirado'}
                   </Text>
                 </View>
-                <Ionicons name="arrow-forward-circle" size={28} color={getAppColor(app)} />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.renewButton}
+                  onPress={() => {
+                    setSelectedApp(info.appName);
+                    router.push('/terms');
+                  }}
+                >
+                  <Text style={styles.renewButtonText}>
+                    {language === 'en' ? 'Renew' : 'Renovar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ))}
           </View>
         )}
@@ -259,11 +380,18 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {/* Price Info */}
-        <Text style={styles.priceInfo}>
-          {language === 'en' 
-            ? '$5.00 per app • Guides + Zip Codes' 
-            : '$5.00 por app • Guías + Códigos Postales'}
-        </Text>
+        <View style={styles.priceInfoContainer}>
+          <Text style={styles.priceInfo}>
+            {language === 'en' 
+              ? '$5.00 per app • 48h Access' 
+              : '$5.00 por app • Acceso 48h'}
+          </Text>
+          <Text style={styles.priceSubInfo}>
+            {language === 'en' 
+              ? 'Guides + 5 Zip Codes' 
+              : 'Guías + 5 Códigos Postales'}
+          </Text>
+        </View>
 
         {/* Admin Access */}
         <TouchableOpacity
@@ -331,6 +459,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: COLORS.textSecondary,
+    fontSize: 16,
   },
   scrollContent: {
     flexGrow: 1,
@@ -471,10 +609,62 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.textPrimary,
   },
-  paidAppStatus: {
+  timerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  timerText: {
     fontSize: 12,
-    color: COLORS.success,
+    color: COLORS.warning,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+  expiredAppsSection: {
+    width: '100%',
+    backgroundColor: `${COLORS.warning}10`,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: COLORS.warning,
+  },
+  expiredAppsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  expiredAppsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.warning,
+    marginLeft: 10,
+  },
+  expiredAppItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.textMuted,
+  },
+  expiredText: {
+    fontSize: 12,
+    color: COLORS.error,
     marginTop: 2,
+  },
+  renewButton: {
+    backgroundColor: COLORS.warning,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  renewButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   featureItem: {
     flexDirection: 'row',
@@ -522,10 +712,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
+  priceInfoContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
   priceInfo: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+  },
+  priceSubInfo: {
     fontSize: 14,
     color: COLORS.textMuted,
-    marginBottom: 30,
+    marginTop: 4,
   },
   adminButton: {
     flexDirection: 'row',
