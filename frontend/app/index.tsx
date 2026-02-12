@@ -14,20 +14,55 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { seedData } from '../src/services/api';
+import { seedData, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguageStore();
-  const { resetForNewPurchase } = useAppStore();
+  const { 
+    resetForNewPurchase, 
+    getActivePurchases, 
+    getRemainingTime,
+    isAppActive,
+    setSelectedApp,
+    setPaymentComplete,
+    setZipCodes,
+    setGuides,
+    setVoiceGuides,
+  } = useAppStore();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [activePurchases, setActivePurchases] = useState<any[]>([]);
+  const [timeLeft, setTimeLeft] = useState<{[key: string]: {hours: number, minutes: number}}>({});
 
   useEffect(() => {
     resetForNewPurchase();
     initializeData();
+    loadActivePurchases();
+  }, []);
+
+  // Update timer every minute
+  useEffect(() => {
+    const updateTimers = () => {
+      const purchases = getActivePurchases();
+      setActivePurchases(purchases);
+      
+      const times: {[key: string]: {hours: number, minutes: number}} = {};
+      purchases.forEach(p => {
+        const remaining = getRemainingTime(p.appName);
+        if (remaining) {
+          times[p.appName] = remaining;
+        }
+      });
+      setTimeLeft(times);
+    };
+
+    updateTimers();
+    const interval = setInterval(updateTimers, 60000); // Update every minute
+
+    return () => clearInterval(interval);
   }, []);
 
   const initializeData = async () => {
@@ -41,12 +76,66 @@ export default function HomeScreen() {
     }
   };
 
+  const loadActivePurchases = () => {
+    const purchases = getActivePurchases();
+    setActivePurchases(purchases);
+  };
+
   const handleGetStarted = () => {
     router.push('/select-app');
   };
 
   const handleAdminAccess = () => {
     router.push('/admin/login');
+  };
+
+  const handleAccessPurchase = async (appName: string) => {
+    try {
+      setSelectedApp(appName);
+      setPaymentComplete(true);
+      
+      // Load content for the purchased app
+      const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
+        getZipCodesByApp(appName),
+        getGuidesByApp(appName),
+        getGuidesByApp('google_voice'),
+      ]);
+
+      setZipCodes(zipCodesData);
+      setGuides(guidesData);
+      setVoiceGuides(voiceGuidesData);
+
+      router.push('/results');
+    } catch (error) {
+      console.error('Error loading content:', error);
+    }
+  };
+
+  const getAppDisplayName = (app: string) => {
+    switch (app.toLowerCase()) {
+      case 'spark': return 'Spark Driver';
+      case 'doordash': return 'DoorDash';
+      case 'instacart': return 'Instacart';
+      default: return app;
+    }
+  };
+
+  const getAppIcon = (app: string) => {
+    switch (app.toLowerCase()) {
+      case 'spark': return 'car';
+      case 'doordash': return 'fast-food';
+      case 'instacart': return 'cart';
+      default: return 'apps';
+    }
+  };
+
+  const getAppColor = (app: string) => {
+    switch (app.toLowerCase()) {
+      case 'spark': return '#FFC107';
+      case 'doordash': return '#FF5722';
+      case 'instacart': return '#4CAF50';
+      default: return COLORS.accent;
+    }
   };
 
   return (
@@ -83,6 +172,52 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Active Purchases Section */}
+        {activePurchases.length > 0 && (
+          <View style={styles.purchasesSection}>
+            <View style={styles.purchasesHeader}>
+              <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+              <Text style={styles.purchasesTitle}>
+                {language === 'en' ? 'Your Active Purchases' : 'Tus Compras Activas'}
+              </Text>
+            </View>
+            
+            {activePurchases.map((purchase) => {
+              const time = timeLeft[purchase.appName];
+              return (
+                <TouchableOpacity
+                  key={purchase.appName}
+                  style={[styles.purchaseCard, { borderColor: getAppColor(purchase.appName) }]}
+                  onPress={() => handleAccessPurchase(purchase.appName)}
+                >
+                  <View style={[styles.purchaseIcon, { backgroundColor: `${getAppColor(purchase.appName)}20` }]}>
+                    <Ionicons name={getAppIcon(purchase.appName) as any} size={28} color={getAppColor(purchase.appName)} />
+                  </View>
+                  <View style={styles.purchaseInfo}>
+                    <Text style={styles.purchaseName}>{getAppDisplayName(purchase.appName)}</Text>
+                    <View style={styles.timerRow}>
+                      <Ionicons name="time" size={14} color={COLORS.warning} />
+                      <Text style={styles.timerText}>
+                        {time ? `${time.hours}h ${time.minutes}m` : '...'} {language === 'en' ? 'remaining' : 'restante'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.purchaseBadge}>
+                    <Ionicons name="checkmark" size={16} color="#fff" />
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color={getAppColor(purchase.appName)} />
+                </TouchableOpacity>
+              );
+            })}
+            
+            <Text style={styles.purchaseHint}>
+              {language === 'en' 
+                ? 'Tap to access your purchased content' 
+                : 'Toca para acceder a tu contenido comprado'}
+            </Text>
+          </View>
+        )}
+
         {/* Description */}
         <View style={styles.descriptionContainer}>
           <Text style={styles.description}>{t('app.description')}</Text>
@@ -94,21 +229,25 @@ export default function HomeScreen() {
             icon="car"
             text={t('select.spark')}
             color="#FFC107"
+            isActive={isAppActive('spark')}
           />
           <FeatureItem
             icon="fast-food"
             text={t('select.doordash')}
             color="#FF5722"
+            isActive={isAppActive('doordash')}
           />
           <FeatureItem
             icon="cart"
             text={t('select.instacart')}
             color="#4CAF50"
+            isActive={isAppActive('instacart')}
           />
           <FeatureItem
             icon="call"
             text={language === 'en' ? 'Free Google Voice Number' : 'Número Google Voice Gratis'}
             color={COLORS.accent}
+            isActive={false}
           />
         </View>
 
@@ -123,7 +262,9 @@ export default function HomeScreen() {
           ) : (
             <>
               <Ionicons name="rocket" size={24} color="#fff" />
-              <Text style={styles.mainButtonText}>{t('app.getStarted')}</Text>
+              <Text style={styles.mainButtonText}>
+                {language === 'en' ? 'Buy New App - $5.00' : 'Comprar Nueva App - $5.00'}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -195,12 +336,17 @@ export default function HomeScreen() {
   );
 }
 
-const FeatureItem = ({ icon, text, color }: { icon: string; text: string; color: string }) => (
-  <View style={styles.featureItem}>
+const FeatureItem = ({ icon, text, color, isActive }: { icon: string; text: string; color: string; isActive: boolean }) => (
+  <View style={[styles.featureItem, isActive && styles.featureItemActive]}>
     <View style={[styles.featureIconContainer, { backgroundColor: `${color}20` }]}>
       <Ionicons name={icon as any} size={24} color={color} />
     </View>
     <Text style={styles.featureText}>{text}</Text>
+    {isActive && (
+      <View style={styles.activeIndicator}>
+        <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+      </View>
+    )}
   </View>
 );
 
@@ -284,6 +430,77 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontWeight: '500',
   },
+  purchasesSection: {
+    width: '100%',
+    backgroundColor: `${COLORS.success}10`,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: COLORS.success,
+  },
+  purchasesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  purchasesTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.success,
+    marginLeft: 10,
+  },
+  purchaseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 2,
+  },
+  purchaseIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  purchaseInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  purchaseName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+  },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  timerText: {
+    fontSize: 12,
+    color: COLORS.warning,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+  purchaseBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  purchaseHint: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   descriptionContainer: {
     backgroundColor: COLORS.surface,
     borderRadius: 16,
@@ -314,6 +531,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.primaryLight,
   },
+  featureItemActive: {
+    borderColor: COLORS.success,
+    borderWidth: 2,
+  },
   featureIconContainer: {
     width: 44,
     height: 44,
@@ -326,6 +547,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     flex: 1,
+  },
+  activeIndicator: {
+    marginLeft: 8,
   },
   mainButton: {
     flexDirection: 'row',
