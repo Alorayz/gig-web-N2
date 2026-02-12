@@ -232,19 +232,8 @@ export default function HomeScreen() {
   const validPaidApps = paidAppsInfo.filter(info => isAppValid(info.appName));
   const expiredApps = paidAppsInfo.filter(info => !isAppValid(info.appName));
 
-  // Show loading while initializing
-  if (!isInitialized) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
-          <Text style={styles.loadingText}>
-            {language === 'en' ? 'Loading...' : 'Cargando...'}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Show loading while initializing - removed to avoid infinite loop
+  // The app will render with isInitialized=true from start
 
   return (
     <SafeAreaView style={styles.container}>
