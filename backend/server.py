@@ -1233,35 +1233,27 @@ async def check_zip_rotation():
 async def seed_initial_data():
     """Seed initial data for the application"""
     
-    # Seed zip codes - DIFFERENT for each app, no duplicates
-    initial_zip_codes = [
-        # Spark Driver - Walmart focused areas (South & Central US)
-        {"zip_code": "75201", "city": "Dallas", "state": "TX", "app_name": "spark", "availability_score": 85},
-        {"zip_code": "73301", "city": "Austin", "state": "TX", "app_name": "spark", "availability_score": 80},
-        {"zip_code": "37201", "city": "Nashville", "state": "TN", "app_name": "spark", "availability_score": 82},
-        {"zip_code": "72201", "city": "Little Rock", "state": "AR", "app_name": "spark", "availability_score": 78},
-        {"zip_code": "73102", "city": "Oklahoma City", "state": "OK", "app_name": "spark", "availability_score": 75},
-        
-        # DoorDash - High population urban areas
-        {"zip_code": "30301", "city": "Atlanta", "state": "GA", "app_name": "doordash", "availability_score": 88},
-        {"zip_code": "89101", "city": "Las Vegas", "state": "NV", "app_name": "doordash", "availability_score": 84},
-        {"zip_code": "85281", "city": "Tempe", "state": "AZ", "app_name": "doordash", "availability_score": 79},
-        {"zip_code": "46201", "city": "Indianapolis", "state": "IN", "app_name": "doordash", "availability_score": 76},
-        {"zip_code": "43201", "city": "Columbus", "state": "OH", "app_name": "doordash", "availability_score": 77},
-        
-        # Instacart - Grocery-rich suburban areas
-        {"zip_code": "90001", "city": "Los Angeles", "state": "CA", "app_name": "instacart", "availability_score": 90},
-        {"zip_code": "94102", "city": "San Francisco", "state": "CA", "app_name": "instacart", "availability_score": 87},
-        {"zip_code": "98101", "city": "Seattle", "state": "WA", "app_name": "instacart", "availability_score": 83},
-        {"zip_code": "02101", "city": "Boston", "state": "MA", "app_name": "instacart", "availability_score": 80},
-        {"zip_code": "60601", "city": "Chicago", "state": "IL", "app_name": "instacart", "availability_score": 85},
-    ]
+    # Check if we need to rotate zip codes
+    config = await db.system_config.find_one({"key": "last_zip_rotation"})
+    should_rotate = False
     
-    # Clear old zip codes and insert fresh ones
-    await db.zip_codes.delete_many({})
-    for zc in initial_zip_codes:
-        zip_code = ZipCode(**zc, expires_at=datetime.utcnow() + timedelta(days=7))
-        await db.zip_codes.insert_one(zip_code.dict())
+    if config:
+        last_rotation = config.get("value")
+        if last_rotation:
+            # Rotate if more than 7 days have passed
+            if datetime.utcnow() - last_rotation > timedelta(days=7):
+                should_rotate = True
+    else:
+        # First time seeding
+        should_rotate = True
+    
+    if should_rotate:
+        await rotate_zip_codes()
+    else:
+        # Just check if zip codes exist, if not seed them
+        existing_count = await db.zip_codes.count_documents({})
+        if existing_count == 0:
+            await rotate_zip_codes()
     
     # Create default admin if not exists
     default_admin = await db.admins.find_one({"username": "admin"})
