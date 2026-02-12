@@ -60,6 +60,7 @@ export const useAppStore = create<AppState>()(
       guides: [],
       voiceGuides: [],
       deviceId: '',
+      userId: '',
       paidApps: [],
       paidAppsInfo: [],
       lastSessionId: null,
@@ -124,8 +125,29 @@ export const useAppStore = create<AppState>()(
         if (!appInfo) return null;
         return appInfo.expiresAt;
       },
+      getRemainingTime: (app) => {
+        const paidAppsInfo = get().paidAppsInfo || [];
+        const appLower = app.toLowerCase();
+        const appInfo = paidAppsInfo.find(p => p.appName === appLower);
+        
+        if (!appInfo) return '';
+        
+        const now = Date.now();
+        const remaining = appInfo.expiresAt - now;
+        
+        if (remaining <= 0) return 'Expirado';
+        
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (hours > 0) {
+          return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
+      },
       setLastSessionId: (id) => set({ lastSessionId: id }),
       setDeviceId: (id) => set({ deviceId: id }),
+      setUserId: (id) => set({ userId: id }),
       setHydrated: (hydrated) => set({ isHydrated: hydrated }),
       reset: () => set({ 
         selectedApp: null, 
@@ -153,6 +175,7 @@ export const useAppStore = create<AppState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         deviceId: state.deviceId,
+        userId: state.userId,
         paidApps: state.paidApps,
         paidAppsInfo: state.paidAppsInfo,
         lastSessionId: state.lastSessionId,
@@ -165,7 +188,14 @@ export const useAppStore = create<AppState>()(
             Crypto.getRandomBytesAsync(16).then((randomBytes) => {
               const newId = 'device_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 24);
               state.setDeviceId(newId);
+              // Also use deviceId as userId if not set
+              if (!state.userId || state.userId.length === 0) {
+                state.setUserId(newId);
+              }
             });
+          } else if (!state.userId || state.userId.length === 0) {
+            // Use existing deviceId as userId
+            state.setUserId(state.deviceId);
           }
         }
       },
