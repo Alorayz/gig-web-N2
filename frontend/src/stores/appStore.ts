@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 
 interface AppState {
   selectedApp: string | null;
@@ -10,10 +11,9 @@ interface AppState {
   zipCodes: any[];
   guides: any[];
   voiceGuides: any[];
-  userId: string;
+  deviceId: string;
   paidApps: string[];
   lastSessionId: string | null;
-  isHydrated: boolean;
   
   setSelectedApp: (app: string | null) => void;
   setTermsAccepted: (accepted: boolean) => void;
@@ -26,15 +26,10 @@ interface AppState {
   addPaidApp: (app: string) => void;
   isAppPaid: (app: string) => boolean;
   setLastSessionId: (id: string | null) => void;
-  setHydrated: (hydrated: boolean) => void;
+  setDeviceId: (id: string) => void;
   reset: () => void;
   resetForNewPurchase: () => void;
 }
-
-// Generate a unique user ID
-const generateUserId = () => {
-  return 'user_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-};
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -46,10 +41,9 @@ export const useAppStore = create<AppState>()(
       zipCodes: [],
       guides: [],
       voiceGuides: [],
-      userId: '', // Will be set on first hydration or generated if empty
+      deviceId: '',
       paidApps: [],
       lastSessionId: null,
-      isHydrated: false,
       
       setSelectedApp: (app) => set({ selectedApp: app }),
       setTermsAccepted: (accepted) => set({ termsAccepted: accepted }),
@@ -58,25 +52,20 @@ export const useAppStore = create<AppState>()(
       setZipCodes: (codes) => set({ zipCodes: codes }),
       setGuides: (guides) => set({ guides: guides }),
       setVoiceGuides: (guides) => set({ voiceGuides: guides }),
-      setPaidApps: (apps) => {
-        console.log('Setting paid apps:', apps);
-        set({ paidApps: apps });
-      },
+      setPaidApps: (apps) => set({ paidApps: apps }),
       addPaidApp: (app) => {
-        const currentPaidApps = get().paidApps;
+        const currentPaidApps = get().paidApps || [];
         const appLower = app.toLowerCase();
         if (!currentPaidApps.includes(appLower)) {
-          const newPaidApps = [...currentPaidApps, appLower];
-          console.log('Adding paid app:', appLower, 'New list:', newPaidApps);
-          set({ paidApps: newPaidApps });
+          set({ paidApps: [...currentPaidApps, appLower] });
         }
       },
       isAppPaid: (app) => {
-        const isPaid = get().paidApps.includes(app.toLowerCase());
-        return isPaid;
+        const paidApps = get().paidApps || [];
+        return paidApps.includes(app.toLowerCase());
       },
       setLastSessionId: (id) => set({ lastSessionId: id }),
-      setHydrated: (hydrated) => set({ isHydrated: hydrated }),
+      setDeviceId: (id) => set({ deviceId: id }),
       reset: () => set({ 
         selectedApp: null, 
         termsAccepted: false, 
@@ -99,44 +88,29 @@ export const useAppStore = create<AppState>()(
       }),
     }),
     {
-      name: 'gig-zipfinder-storage',
+      name: 'gig-zipfinder-storage-v2',
       storage: createJSONStorage(() => AsyncStorage),
-      // Persist these fields
       partialize: (state) => ({
-        userId: state.userId,
+        deviceId: state.deviceId,
         paidApps: state.paidApps,
         lastSessionId: state.lastSessionId,
       }),
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          console.log('Error rehydrating storage:', error);
-          return;
-        }
-        
-        console.log('Storage rehydrated - userId:', state?.userId, 'paidApps:', state?.paidApps);
-        
-        // If no userId exists after rehydration, generate one
-        if (!state?.userId) {
-          const newUserId = generateUserId();
-          console.log('Generated new userId:', newUserId);
-          useAppStore.setState({ userId: newUserId, isHydrated: true });
-        } else {
-          useAppStore.setState({ isHydrated: true });
-        }
-      },
     }
   )
 );
 
-// Initialize userId if not set (for first run)
-const initializeUserId = () => {
+// Helper function to get or create device ID
+export const getDeviceId = async (): Promise<string> => {
   const state = useAppStore.getState();
-  if (!state.userId) {
-    const newUserId = generateUserId();
-    console.log('Initial userId generation:', newUserId);
-    useAppStore.setState({ userId: newUserId });
+  
+  if (state.deviceId && state.deviceId.length > 0) {
+    return state.deviceId;
   }
+  
+  // Generate a new device ID
+  const randomBytes = await Crypto.getRandomBytesAsync(16);
+  const newId = 'device_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 24);
+  
+  useAppStore.getState().setDeviceId(newId);
+  return newId;
 };
-
-// Call this after a short delay to ensure hydration has happened
-setTimeout(initializeUserId, 100);
