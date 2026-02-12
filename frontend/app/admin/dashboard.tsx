@@ -24,6 +24,8 @@ import {
   createZipCode,
   triggerAISearch,
   adminLogout,
+  rotateZipCodes,
+  checkRotationStatus,
 } from '../../src/services/api';
 
 type TabType = 'stats' | 'payments' | 'zipcodes';
