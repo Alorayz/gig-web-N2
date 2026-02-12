@@ -28,7 +28,7 @@ export default function PaymentScreen() {
     setZipCodes,
     setGuides,
     setVoiceGuides,
-    addPaidApp,
+    addPurchase,
     lastSessionId,
     setLastSessionId,
     resetForNewPurchase,
