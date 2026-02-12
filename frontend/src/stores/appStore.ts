@@ -19,6 +19,7 @@ interface AppState {
   guides: any[];
   voiceGuides: any[];
   deviceId: string;
+  userId: string; // Added userId for API calls
   paidApps: string[]; // Keep for backward compatibility
   paidAppsInfo: PaidAppInfo[]; // New: paid apps with expiration info
   lastSessionId: string | null;
@@ -36,8 +37,10 @@ interface AppState {
   isAppPaid: (app: string) => boolean;
   isAppValid: (app: string) => boolean; // New: check if app is paid AND not expired
   getAppExpiration: (app: string) => number | null; // New: get expiration timestamp
+  getRemainingTime: (app: string) => string; // New: get human readable remaining time
   setLastSessionId: (id: string | null) => void;
   setDeviceId: (id: string) => void;
+  setUserId: (id: string) => void;
   setHydrated: (hydrated: boolean) => void;
   reset: () => void;
   resetForNewPurchase: () => void;
