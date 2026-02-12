@@ -46,23 +46,23 @@ export default function HomeScreen() {
   const [isLoadingPaidApps, setIsLoadingPaidApps] = useState(true);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<{[key: string]: string}>({});
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(true); // Start as initialized
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
-  // Initialize on mount
+  // Initialize user ID on mount
   useEffect(() => {
-    const initialize = async () => {
+    const initUserId = async () => {
       try {
-        // Get or create device ID
         const id = await getDeviceId();
         setCurrentUserId(id);
-        setIsInitialized(true);
       } catch (error) {
-        console.error('Error initializing:', error);
-        setIsInitialized(true); // Continue anyway
+        console.error('Error getting device ID:', error);
+        // Generate a fallback ID
+        const fallbackId = 'device_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        setCurrentUserId(fallbackId);
       }
     };
-    initialize();
+    initUserId();
   }, []);
 
   // Update countdown timer every minute
