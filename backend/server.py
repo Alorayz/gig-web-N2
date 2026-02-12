@@ -1057,41 +1057,48 @@ AL HACER CLIC EN "ACEPTO" O USAR ESTA APP, USTED RECONOCE QUE HA LEÍDO, ENTENDI
 async def seed_initial_data():
     """Seed initial data for the application"""
     
-    # Seed zip codes
+    # Seed zip codes - DIFFERENT for each app, no duplicates
     initial_zip_codes = [
-        # Spark Driver
+        # Spark Driver - Walmart focused areas (South & Central US)
         {"zip_code": "75201", "city": "Dallas", "state": "TX", "app_name": "spark", "availability_score": 85},
-        {"zip_code": "85001", "city": "Phoenix", "state": "AZ", "app_name": "spark", "availability_score": 80},
-        {"zip_code": "28202", "city": "Charlotte", "state": "NC", "app_name": "spark", "availability_score": 78},
+        {"zip_code": "73301", "city": "Austin", "state": "TX", "app_name": "spark", "availability_score": 80},
         {"zip_code": "37201", "city": "Nashville", "state": "TN", "app_name": "spark", "availability_score": 82},
-        {"zip_code": "32801", "city": "Orlando", "state": "FL", "app_name": "spark", "availability_score": 75},
-        {"zip_code": "78201", "city": "San Antonio", "state": "TX", "app_name": "spark", "availability_score": 77},
-        {"zip_code": "80202", "city": "Denver", "state": "CO", "app_name": "spark", "availability_score": 79},
+        {"zip_code": "72201", "city": "Little Rock", "state": "AR", "app_name": "spark", "availability_score": 78},
+        {"zip_code": "73102", "city": "Oklahoma City", "state": "OK", "app_name": "spark", "availability_score": 75},
         
-        # DoorDash
+        # DoorDash - High population urban areas
         {"zip_code": "30301", "city": "Atlanta", "state": "GA", "app_name": "doordash", "availability_score": 88},
         {"zip_code": "89101", "city": "Las Vegas", "state": "NV", "app_name": "doordash", "availability_score": 84},
-        {"zip_code": "33101", "city": "Miami", "state": "FL", "app_name": "doordash", "availability_score": 81},
-        {"zip_code": "77001", "city": "Houston", "state": "TX", "app_name": "doordash", "availability_score": 86},
         {"zip_code": "85281", "city": "Tempe", "state": "AZ", "app_name": "doordash", "availability_score": 79},
         {"zip_code": "46201", "city": "Indianapolis", "state": "IN", "app_name": "doordash", "availability_score": 76},
         {"zip_code": "43201", "city": "Columbus", "state": "OH", "app_name": "doordash", "availability_score": 77},
         
-        # Instacart
+        # Instacart - Grocery-rich suburban areas
         {"zip_code": "90001", "city": "Los Angeles", "state": "CA", "app_name": "instacart", "availability_score": 90},
         {"zip_code": "94102", "city": "San Francisco", "state": "CA", "app_name": "instacart", "availability_score": 87},
         {"zip_code": "98101", "city": "Seattle", "state": "WA", "app_name": "instacart", "availability_score": 83},
         {"zip_code": "02101", "city": "Boston", "state": "MA", "app_name": "instacart", "availability_score": 80},
         {"zip_code": "60601", "city": "Chicago", "state": "IL", "app_name": "instacart", "availability_score": 85},
-        {"zip_code": "19101", "city": "Philadelphia", "state": "PA", "app_name": "instacart", "availability_score": 78},
-        {"zip_code": "92101", "city": "San Diego", "state": "CA", "app_name": "instacart", "availability_score": 82},
     ]
     
+    # Clear old zip codes and insert fresh ones
+    await db.zip_codes.delete_many({})
     for zc in initial_zip_codes:
-        existing = await db.zip_codes.find_one({"zip_code": zc["zip_code"], "app_name": zc["app_name"]})
-        if not existing:
-            zip_code = ZipCode(**zc, expires_at=datetime.utcnow() + timedelta(days=7))
-            await db.zip_codes.insert_one(zip_code.dict())
+        zip_code = ZipCode(**zc, expires_at=datetime.utcnow() + timedelta(days=7))
+        await db.zip_codes.insert_one(zip_code.dict())
+    
+    # Create default admin if not exists
+    default_admin = await db.admins.find_one({"username": "admin"})
+    if not default_admin:
+        # Create default admin with a known TOTP secret for testing
+        default_totp_secret = "GXMYOWV77JP4ONEAQRRBGK4PJHUTMKEO"
+        admin = AdminUser(
+            username="admin",
+            password_hash=hash_password("admin_password_123"),
+            totp_secret=default_totp_secret
+        )
+        await db.admins.insert_one(admin.dict())
+        logger.info("Default admin created with username: admin, password: admin_password_123")
     
     # Seed guides
     initial_guides = [
