@@ -181,6 +181,14 @@ export const useAppStore = create<AppState>()(
         lastSessionId: state.lastSessionId,
       }),
       onRehydrateStorage: () => (state) => {
+        // Set hydrated immediately when rehydration completes
+        setTimeout(() => {
+          const currentState = useAppStore.getState();
+          if (!currentState.isHydrated) {
+            currentState.setHydrated(true);
+          }
+        }, 100);
+        
         if (state) {
           state.setHydrated(true);
           // Generate device ID if not present
@@ -202,6 +210,24 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
+
+// Initialize hydration after a timeout (for cases when onRehydrateStorage doesn't fire)
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    const state = useAppStore.getState();
+    if (!state.isHydrated) {
+      state.setHydrated(true);
+      // Generate device ID if not set
+      if (!state.deviceId || state.deviceId.length === 0) {
+        Crypto.getRandomBytesAsync(16).then((randomBytes) => {
+          const newId = 'device_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 24);
+          state.setDeviceId(newId);
+          state.setUserId(newId);
+        });
+      }
+    }
+  }, 500);
+}
 
 // Helper function to get or create device ID
 export const getDeviceId = async (): Promise<string> => {
