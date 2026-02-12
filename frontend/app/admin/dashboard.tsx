@@ -43,6 +43,8 @@ export default function AdminDashboardScreen() {
   const [zipCodes, setZipCodes] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [aiSearching, setAiSearching] = useState(false);
+  const [rotationInfo, setRotationInfo] = useState<any>(null);
+  const [isRotating, setIsRotating] = useState(false);
   const [newZipCode, setNewZipCode] = useState({
     zip_code: '',
     city: '',
@@ -57,7 +59,47 @@ export default function AdminDashboardScreen() {
       return;
     }
     loadData();
+    loadRotationStatus();
   }, [token]);
+
+  const loadRotationStatus = async () => {
+    try {
+      const status = await checkRotationStatus();
+      setRotationInfo(status);
+    } catch (error) {
+      console.error('Error loading rotation status:', error);
+    }
+  };
+
+  const handleRotateZipCodes = async () => {
+    if (!token) return;
+    
+    Alert.alert(
+      'Rotar Códigos Postales',
+      '¿Estás seguro de que quieres rotar los códigos postales a un nuevo conjunto? Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Rotar',
+          style: 'destructive',
+          onPress: async () => {
+            setIsRotating(true);
+            try {
+              await rotateZipCodes(token);
+              Alert.alert('Éxito', 'Códigos postales rotados correctamente');
+              loadData();
+              loadRotationStatus();
+            } catch (error) {
+              console.error('Error rotating zip codes:', error);
+              Alert.alert('Error', 'No se pudieron rotar los códigos postales');
+            } finally {
+              setIsRotating(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadData = async () => {
     if (!token) return;
