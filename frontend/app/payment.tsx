@@ -64,7 +64,7 @@ export default function PaymentScreen() {
     
     try {
       // Create Checkout Session directly
-      const checkoutData = await createCheckoutSession(userId, selectedApp, termsAccepted);
+      const checkoutData = await createCheckoutSession(userIdToUse, selectedApp, termsAccepted);
       setCurrentSessionId(checkoutData.session_id);
       setCheckoutUrl(checkoutData.checkout_url);
       setLastSessionId(checkoutData.session_id); // Save for later verification
