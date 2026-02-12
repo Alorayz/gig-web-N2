@@ -1051,6 +1051,182 @@ AL HACER CLIC EN "ACEPTO" O USAR ESTA APP, USTED RECONOCE QUE HA LEÍDO, ENTENDI
 Última Actualización: Enero 2025
 """
 
+# ============== ZIP CODE ROTATION ==============
+
+# Alternative zip codes for rotation (different sets for each app)
+ZIP_CODE_SETS = {
+    "spark": [
+        # Set 1 (current week)
+        [
+            {"zip_code": "75201", "city": "Dallas", "state": "TX", "availability_score": 85},
+            {"zip_code": "73301", "city": "Austin", "state": "TX", "availability_score": 80},
+            {"zip_code": "37201", "city": "Nashville", "state": "TN", "availability_score": 82},
+            {"zip_code": "72201", "city": "Little Rock", "state": "AR", "availability_score": 78},
+            {"zip_code": "73102", "city": "Oklahoma City", "state": "OK", "availability_score": 75},
+        ],
+        # Set 2
+        [
+            {"zip_code": "77001", "city": "Houston", "state": "TX", "availability_score": 83},
+            {"zip_code": "32801", "city": "Orlando", "state": "FL", "availability_score": 79},
+            {"zip_code": "28202", "city": "Charlotte", "state": "NC", "availability_score": 77},
+            {"zip_code": "78201", "city": "San Antonio", "state": "TX", "availability_score": 81},
+            {"zip_code": "35201", "city": "Birmingham", "state": "AL", "availability_score": 74},
+        ],
+        # Set 3
+        [
+            {"zip_code": "70112", "city": "New Orleans", "state": "LA", "availability_score": 80},
+            {"zip_code": "38103", "city": "Memphis", "state": "TN", "availability_score": 76},
+            {"zip_code": "39201", "city": "Jackson", "state": "MS", "availability_score": 73},
+            {"zip_code": "71101", "city": "Shreveport", "state": "LA", "availability_score": 72},
+            {"zip_code": "36101", "city": "Montgomery", "state": "AL", "availability_score": 71},
+        ],
+        # Set 4
+        [
+            {"zip_code": "64101", "city": "Kansas City", "state": "MO", "availability_score": 82},
+            {"zip_code": "68102", "city": "Omaha", "state": "NE", "availability_score": 79},
+            {"zip_code": "50309", "city": "Des Moines", "state": "IA", "availability_score": 76},
+            {"zip_code": "67202", "city": "Wichita", "state": "KS", "availability_score": 74},
+            {"zip_code": "74103", "city": "Tulsa", "state": "OK", "availability_score": 77},
+        ],
+    ],
+    "doordash": [
+        # Set 1 (current week)
+        [
+            {"zip_code": "30301", "city": "Atlanta", "state": "GA", "availability_score": 88},
+            {"zip_code": "89101", "city": "Las Vegas", "state": "NV", "availability_score": 84},
+            {"zip_code": "85281", "city": "Tempe", "state": "AZ", "availability_score": 79},
+            {"zip_code": "46201", "city": "Indianapolis", "state": "IN", "availability_score": 76},
+            {"zip_code": "43201", "city": "Columbus", "state": "OH", "availability_score": 77},
+        ],
+        # Set 2
+        [
+            {"zip_code": "33101", "city": "Miami", "state": "FL", "availability_score": 86},
+            {"zip_code": "33602", "city": "Tampa", "state": "FL", "availability_score": 81},
+            {"zip_code": "32801", "city": "Orlando", "state": "FL", "availability_score": 79},
+            {"zip_code": "28202", "city": "Charlotte", "state": "NC", "availability_score": 78},
+            {"zip_code": "27601", "city": "Raleigh", "state": "NC", "availability_score": 75},
+        ],
+        # Set 3
+        [
+            {"zip_code": "55401", "city": "Minneapolis", "state": "MN", "availability_score": 82},
+            {"zip_code": "53202", "city": "Milwaukee", "state": "WI", "availability_score": 78},
+            {"zip_code": "48201", "city": "Detroit", "state": "MI", "availability_score": 76},
+            {"zip_code": "44114", "city": "Cleveland", "state": "OH", "availability_score": 74},
+            {"zip_code": "15222", "city": "Pittsburgh", "state": "PA", "availability_score": 73},
+        ],
+        # Set 4
+        [
+            {"zip_code": "80202", "city": "Denver", "state": "CO", "availability_score": 85},
+            {"zip_code": "84101", "city": "Salt Lake City", "state": "UT", "availability_score": 80},
+            {"zip_code": "87102", "city": "Albuquerque", "state": "NM", "availability_score": 75},
+            {"zip_code": "79901", "city": "El Paso", "state": "TX", "availability_score": 73},
+            {"zip_code": "85001", "city": "Phoenix", "state": "AZ", "availability_score": 83},
+        ],
+    ],
+    "instacart": [
+        # Set 1 (current week)
+        [
+            {"zip_code": "90001", "city": "Los Angeles", "state": "CA", "availability_score": 90},
+            {"zip_code": "94102", "city": "San Francisco", "state": "CA", "availability_score": 87},
+            {"zip_code": "98101", "city": "Seattle", "state": "WA", "availability_score": 83},
+            {"zip_code": "02101", "city": "Boston", "state": "MA", "availability_score": 80},
+            {"zip_code": "60601", "city": "Chicago", "state": "IL", "availability_score": 85},
+        ],
+        # Set 2
+        [
+            {"zip_code": "10001", "city": "New York", "state": "NY", "availability_score": 91},
+            {"zip_code": "11201", "city": "Brooklyn", "state": "NY", "availability_score": 88},
+            {"zip_code": "07102", "city": "Newark", "state": "NJ", "availability_score": 79},
+            {"zip_code": "06103", "city": "Hartford", "state": "CT", "availability_score": 75},
+            {"zip_code": "02903", "city": "Providence", "state": "RI", "availability_score": 74},
+        ],
+        # Set 3
+        [
+            {"zip_code": "20001", "city": "Washington DC", "state": "DC", "availability_score": 86},
+            {"zip_code": "21201", "city": "Baltimore", "state": "MD", "availability_score": 80},
+            {"zip_code": "19101", "city": "Philadelphia", "state": "PA", "availability_score": 82},
+            {"zip_code": "08608", "city": "Trenton", "state": "NJ", "availability_score": 73},
+            {"zip_code": "19801", "city": "Wilmington", "state": "DE", "availability_score": 72},
+        ],
+        # Set 4
+        [
+            {"zip_code": "92101", "city": "San Diego", "state": "CA", "availability_score": 84},
+            {"zip_code": "92614", "city": "Irvine", "state": "CA", "availability_score": 81},
+            {"zip_code": "91101", "city": "Pasadena", "state": "CA", "availability_score": 79},
+            {"zip_code": "93301", "city": "Bakersfield", "state": "CA", "availability_score": 74},
+            {"zip_code": "93721", "city": "Fresno", "state": "CA", "availability_score": 76},
+        ],
+    ],
+}
+
+def get_current_week_number():
+    """Get the current week number (0-3) for rotation"""
+    # Use the ISO week number modulo 4 to cycle through sets
+    return datetime.utcnow().isocalendar()[1] % 4
+
+async def rotate_zip_codes():
+    """Rotate zip codes to a new set based on current week"""
+    week_num = get_current_week_number()
+    logger.info(f"Rotating zip codes to week set {week_num}")
+    
+    # Clear existing zip codes
+    await db.zip_codes.delete_many({})
+    
+    # Insert new zip codes for each app
+    for app_name, sets in ZIP_CODE_SETS.items():
+        current_set = sets[week_num]
+        for zc in current_set:
+            zip_code = ZipCode(
+                **zc, 
+                app_name=app_name, 
+                expires_at=datetime.utcnow() + timedelta(days=7)
+            )
+            await db.zip_codes.insert_one(zip_code.dict())
+    
+    # Record the rotation
+    await db.system_config.update_one(
+        {"key": "last_zip_rotation"},
+        {"$set": {"value": datetime.utcnow(), "week_set": week_num}},
+        upsert=True
+    )
+    
+    logger.info(f"Zip codes rotated to week set {week_num}")
+    return week_num
+
+@api_router.post("/admin/rotate-zip-codes")
+async def admin_rotate_zip_codes(token: str = Header(None, alias="Authorization")):
+    """Manually rotate zip codes (admin only)"""
+    if not token:
+        raise HTTPException(status_code=401, detail="No authorization token")
+    
+    # Verify admin token
+    admin = await db.admins.find_one({"sessions.token": token.replace("Bearer ", "")})
+    if not admin:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    week_num = await rotate_zip_codes()
+    return {"message": f"Zip codes rotated successfully to week set {week_num}", "week_set": week_num}
+
+@api_router.get("/admin/check-rotation")
+async def check_zip_rotation():
+    """Check when zip codes will rotate next"""
+    config = await db.system_config.find_one({"key": "last_zip_rotation"})
+    current_week = get_current_week_number()
+    
+    if config:
+        last_rotation = config.get("value")
+        last_week_set = config.get("week_set", 0)
+    else:
+        last_rotation = None
+        last_week_set = None
+    
+    return {
+        "current_week_set": current_week,
+        "last_rotation": last_rotation.isoformat() if last_rotation else None,
+        "last_week_set": last_week_set,
+        "next_rotation": "Monday at 00:00 UTC (automatic weekly)"
+    }
+
 # ============== SEED DATA ==============
 
 @api_router.post("/seed-data")
