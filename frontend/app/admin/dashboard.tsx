@@ -296,6 +296,42 @@ export default function AdminDashboardScreen() {
 
   const renderZipCodes = () => (
     <View style={styles.listContainer}>
+      {/* Rotation Info Card */}
+      <View style={styles.rotationCard}>
+        <View style={styles.rotationHeader}>
+          <Ionicons name="refresh-circle" size={24} color="#4CAF50" />
+          <Text style={styles.rotationTitle}>Rotación de Códigos</Text>
+        </View>
+        {rotationInfo && (
+          <View style={styles.rotationInfo}>
+            <Text style={styles.rotationText}>
+              Conjunto actual: {rotationInfo.current_week_set + 1} de 4
+            </Text>
+            <Text style={styles.rotationText}>
+              Última rotación: {rotationInfo.last_rotation ? 
+                new Date(rotationInfo.last_rotation).toLocaleDateString() : 'Nunca'}
+            </Text>
+            <Text style={styles.rotationText}>
+              Próxima: Automática cada lunes (00:00 UTC)
+            </Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={[styles.rotateButton, isRotating && styles.rotateButtonDisabled]}
+          onPress={handleRotateZipCodes}
+          disabled={isRotating}
+        >
+          {isRotating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="sync" size={20} color="#fff" />
+              <Text style={styles.rotateButtonText}>Rotar Ahora</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => setShowAddModal(true)}
