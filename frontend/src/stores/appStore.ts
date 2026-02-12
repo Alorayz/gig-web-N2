@@ -237,10 +237,17 @@ export const getDeviceId = async (): Promise<string> => {
     return state.deviceId;
   }
   
-  // Generate a new device ID
-  const randomBytes = await Crypto.getRandomBytesAsync(16);
-  const newId = 'device_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 24);
+  // Generate a new device ID using fallback for web
+  let newId: string;
+  try {
+    const randomBytes = await Crypto.getRandomBytesAsync(16);
+    newId = 'device_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 24);
+  } catch {
+    // Fallback for web or when crypto fails
+    newId = 'device_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+  }
   
   useAppStore.getState().setDeviceId(newId);
+  useAppStore.getState().setUserId(newId);
   return newId;
 };
