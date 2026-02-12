@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
-import { useAppStore } from '../src/stores/appStore';
+import { useAppStore, getDeviceId } from '../src/stores/appStore';
 import { seedData, getPaidApps, getZipCodesByApp, getGuidesByApp, verifyCheckoutSession } from '../src/services/api';
 
 const { width } = Dimensions.get('window');
@@ -26,7 +26,6 @@ export default function HomeScreen() {
     resetForNewPurchase, 
     deviceId,
     userId,
-    paidApps, 
     paidAppsInfo,
     setPaidApps,
     setSelectedApp,
@@ -39,13 +38,32 @@ export default function HomeScreen() {
     addPaidApp,
     isAppValid,
     getRemainingTime,
-    isHydrated,
+    setDeviceId,
+    setUserId,
   } = useAppStore();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isLoadingPaidApps, setIsLoadingPaidApps] = useState(true);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<{[key: string]: string}>({});
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+
+  // Initialize on mount
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        // Get or create device ID
+        const id = await getDeviceId();
+        setCurrentUserId(id);
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Error initializing:', error);
+        setIsInitialized(true); // Continue anyway
+      }
+    };
+    initialize();
+  }, []);
 
   // Update countdown timer every minute
   useEffect(() => {
@@ -64,14 +82,13 @@ export default function HomeScreen() {
   }, [paidAppsInfo]);
 
   useEffect(() => {
-    // Wait for hydration before initializing
-    if (!isHydrated) return;
+    if (!isInitialized) return;
     
     resetForNewPurchase();
     initializeData();
     loadPaidApps();
     checkPendingPayment();
-  }, [isHydrated]);
+  }, [isInitialized, currentUserId]);
 
   const initializeData = async () => {
     try {
