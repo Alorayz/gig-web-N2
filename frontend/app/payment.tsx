@@ -195,8 +195,17 @@ export default function PaymentScreen() {
         addPurchase(selectedApp);
       }
       
-      const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
-        getZipCodesByApp(selectedApp!),
+      // Use AI to search for fresh zip codes, fallback to existing data
+      let zipCodesData;
+      try {
+        const aiResult = await searchZipCodesWithAI(selectedApp!);
+        zipCodesData = aiResult.zip_codes;
+      } catch (aiError) {
+        console.log('AI search failed, using cached data:', aiError);
+        zipCodesData = await getZipCodesByApp(selectedApp!);
+      }
+      
+      const [guidesData, voiceGuidesData] = await Promise.all([
         getGuidesByApp(selectedApp!),
         getGuidesByApp('google_voice'),
       ]);
