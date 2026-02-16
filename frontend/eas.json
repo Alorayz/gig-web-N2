@@ -18,7 +18,7 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
-        "credentialsSource": "local"
+        "credentialsSource": "remote"
       },
       "distribution": "store",
       "env": {
@@ -28,7 +28,7 @@
     "production": {
       "android": {
         "buildType": "app-bundle",
-        "credentialsSource": "local"
+        "credentialsSource": "remote"
       },
       "distribution": "store",
       "env": {
