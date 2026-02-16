@@ -2,15 +2,16 @@
   "expo": {
     "name": "GIG ZipFinder",
     "slug": "gig-zipfinder",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gigzipfinder",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gigzipfinder.app",
+      "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents for verification",
         "NSPhotoLibraryUsageDescription": "Upload profile photos"
@@ -26,9 +27,8 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.gigzipfinder.app",
+      "versionCode": 2,
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.INTERNET"
       ],
       "intentFilters": [
@@ -45,7 +45,10 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "config": {
+        "googleServicesFile": "./google-services.json"
+      }
     },
     "web": {
       "bundler": "metro",
