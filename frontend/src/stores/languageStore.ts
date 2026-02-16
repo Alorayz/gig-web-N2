@@ -155,7 +155,7 @@ const translations: Record<string, Record<string, string>> = {
     'payment.includes': 'Tu compra incluye:',
     'payment.item1': '5 códigos postales con alto potencial de disponibilidad',
     'payment.item2': 'Guía completa paso a paso para abrir cuenta',
-    'payment.item3': 'Guía completa de número gratuito Google Voice',
+    'payment.item3': 'Guía completa de número de teléfono gratuito',
     'payment.success': '¡Pago Exitoso!',
     'payment.failed': 'Pago Fallido',
     'payment.tryAgain': 'Por favor intente de nuevo',
