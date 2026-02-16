@@ -16,9 +16,14 @@ import base64
 import io
 import qrcode
 import stripe
+import httpx
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Emergent LLM Key for AI search
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-5925220033f944a85B')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
