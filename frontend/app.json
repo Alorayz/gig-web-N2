@@ -27,8 +27,7 @@
       "package": "com.gigzipfinder.app",
       "versionCode": 7,
       "permissions": [
-        "android.permission.INTERNET",
-        "com.google.android.gms.permission.AD_ID"
+        "android.permission.INTERNET"
       ],
       "intentFilters": [
         {
