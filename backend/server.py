@@ -867,6 +867,98 @@ async def trigger_ai_search(app_name: str):
         logging.error(f"AI search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI search failed: {str(e)}")
 
+
+@api_router.post("/search-zip-codes/{app_name}")
+async def search_zip_codes_for_purchase(app_name: str):
+    """Search for zip codes using AI when a user purchases - public endpoint"""
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    
+    try:
+        emergent_key = os.environ.get('EMERGENT_LLM_KEY', EMERGENT_LLM_KEY)
+        if not emergent_key:
+            # Return cached data if AI not available
+            existing = await db.zip_codes.find({"app_name": app_name.lower()}).to_list(5)
+            return {"zip_codes": serialize_doc(existing), "source": "cache"}
+        
+        # First check if we have recent AI-generated codes (less than 1 hour old)
+        recent_codes = await db.zip_codes.find({
+            "app_name": app_name.lower(),
+            "source": "ai_search",
+            "created_at": {"$gte": datetime.utcnow() - timedelta(hours=1)}
+        }).to_list(5)
+        
+        if len(recent_codes) >= 5:
+            return {"zip_codes": serialize_doc(recent_codes), "source": "recent_ai"}
+        
+        # Generate new codes with AI
+        chat = LlmChat(
+            api_key=emergent_key,
+            session_id=f"purchase-zip-{app_name}-{datetime.utcnow().isoformat()}",
+            system_message=f"""You are an expert on the gig economy in the United States. Help users find the best zip codes to sign up for {app_name}.
+            
+            Based on current market conditions and your knowledge, suggest exactly 5 US zip codes where {app_name} is actively hiring or has high demand.
+            
+            Consider:
+            - Cities with high population growth
+            - Areas with many restaurants and grocery stores
+            - Suburbs of major metropolitan areas
+            - Areas with limited driver/shopper supply
+            
+            Respond ONLY with a valid JSON array:
+            [{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85}}]
+            
+            Score: 1-100 (higher = better chance of getting accepted)
+            NO other text - ONLY the JSON array."""
+        ).with_model("openai", "gpt-4o-mini")
+        
+        user_message = UserMessage(
+            text=f"What are the 5 best US zip codes to apply for {app_name} right now? Return ONLY JSON array."
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        # Clean and parse response
+        clean_response = response.strip()
+        if clean_response.startswith("```"):
+            lines = clean_response.split("\n")
+            clean_response = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+        if clean_response.startswith("json"):
+            clean_response = clean_response[4:]
+        clean_response = clean_response.strip()
+        
+        zip_data = json.loads(clean_response)
+        
+        # Save to database and return
+        result_codes = []
+        for item in zip_data[:5]:  # Limit to 5
+            zip_code_obj = ZipCode(
+                zip_code=item["zip_code"],
+                city=item["city"],
+                state=item["state"],
+                app_name=app_name.lower(),
+                availability_score=item.get("score", 75),
+                source="ai_search",
+                expires_at=datetime.utcnow() + timedelta(days=7)
+            )
+            
+            # Upsert - update if exists, insert if not
+            await db.zip_codes.update_one(
+                {"zip_code": item["zip_code"], "app_name": app_name.lower()},
+                {"$set": {**zip_code_obj.dict(), "created_at": datetime.utcnow()}},
+                upsert=True
+            )
+            result_codes.append(zip_code_obj.dict())
+        
+        return {"zip_codes": result_codes, "source": "ai_generated"}
+        
+    except Exception as e:
+        logging.error(f"AI search error for purchase: {str(e)}")
+        # Fallback to existing codes
+        existing = await db.zip_codes.find({"app_name": app_name.lower()}).to_list(5)
+        if existing:
+            return {"zip_codes": serialize_doc(existing), "source": "fallback"}
+        raise HTTPException(status_code=500, detail=f"Could not find zip codes: {str(e)}")
+
 # ============== PDF GUIDES DOWNLOAD ==============
 
 GUIDES_DIR = Path("/app/frontend/assets/guides")
