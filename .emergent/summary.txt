@@ -1,207 +1,259 @@
 <analysis>
 
 **original_problem_statement:**
-The user wants to create a mobile application for both Android and iOS.
-PRODUCT REQUIREMENTS:
-1.  **Monetization**: Charge users a  fee.
-2.  **Core Feature**: Provide users with 5 postal codes for cities and towns in the USA that have a high probability of open slots for gig economy apps like Instacart, DoorDash, and Spark Driver.
-3.  **Content**: The app must include:
-    *   Step-by-step guides on how to sign up for each gig app.
-    *   A guide on how to obtain a free second phone number using Google Voice.
-4.  **User Flow**:
-    *   After the  payment, the user chooses which gig app they are interested in (e.g., Spark).
-    *   The app then displays 5 relevant postal codes, the specific guide for that app, and the Google Voice guide.
-    *   To get information for another app (e.g., Instacart), the user must pay another .
-5.  **Payment System**:
-    *   Use a secure third-party payment processor (user chose Stripe).
-    *   The payment model is pay-per-consultation.
-6.  **Admin Panel**:
-    *   An administrator must be able to track payments.
-    *   The administrator must be able to manually update the list of available postal codes.
-    *   Admin login should be secure with a username/password and two-factor authentication (2FA).
-7.  **Data Sourcing**:
-    *   Postal codes should be updatable automatically. The user suggested an AI to search for news and announcements online. This should be a background task not visible to the end-user.
-    *   Codes should be refreshed weekly.
-8.  **Legal & UX**:
-    *   A Terms and Conditions page is required, stating the app is not responsible if codes are already taken.
-    *   The T&C must clarify that the  fee is for the guides, and the postal codes are a free bonus.
-    *   Users must accept the T&C before proceeding to payment.
-9.  **Localization**: The entire application must be available in both English and Spanish.
-10. **Branding**: The app should have a professional logo and color scheme.
+The user wants to create a mobile application for Android and iOS that provides guides and postal codes for gig economy apps. The user has reported a list of critical bugs and requested new features.
 
-**User's preferred language**: Spanish. The next agent MUST respond in Spanish.
+PRODUCT REQUIREMENTS & BUG FIXES:
+1.  **Core Feature**: Provide users with 5 postal codes for US cities with high demand for gig apps (Instacart, DoorDash, Spark Driver).
+2.  **AI-Powered Postal Codes**: Upon a user's purchase, use an AI to search the internet and suggest 5 relevant postal codes in real-time.
+3.  **Distinct & Rotating Codes**: Postal codes must be different for each gig app and should rotate automatically every week.
+4.  **Purchase Expiration**: After a purchase, the user gets access to the content for 48 hours. A timer should be visible. After 48 hours, the content must be locked again. The user must be able to access purchased content anytime within the 48-hour window.
+5.  **User Flow**:
+    *   A user pays , chooses a gig app, and gets access to the codes and guides.
+    *   The purchase is remembered for 48 hours.
+    *   There must be a Return to Home button after viewing results to allow the user to purchase another app's guide.
+6.  **Admin Panel**:
+    *   The admin login must be fixed.
+    *   The admin should be able to see payments and manually trigger the weekly postal code rotation.
+7.  **Branding & UI**:
+    *   The app's logo must appear correctly as the app icon/thumbnail on Android and iOS devices.
+    *   The logo in the generated PDF guides must be updated to match the app's logo.
+    *   The text Google Voice should be changed to Free Phone Number.
+    *   The language selection button should function correctly.
+8.  **App Stability**: Fix crashes or hangs that occur when trying to access purchased content or make a new purchase.
+9.  **Legal**: Create and host a Privacy Policy page accessible via a URL, compliant with US law.
+10. **Builds**:
+    *   Provide a QR code for testing with Expo Go.
+    *   Generate a new APK for Android.
+    *   Generate a new AAB (Android App Bundle) for the Google Play Console, fixing reported errors ( and Advertising ID).
+    *   Generate an IPA for iOS.
+
+**User's preferred language**: Spanish
 
 **what currently exists?**
-A full-stack application has been scaffolded with an Expo (React Native) frontend and a FastAPI backend using a MongoDB database.
--   **Backend**: All API endpoints are created in , including user/admin management with 2FA, creating/managing zip codes, and generating payment intents with Stripe. **Live Stripe keys have been integrated**.
--   **Frontend**: All screens for the user flow (, , , , ) and admin (, ) are created using . A color scheme based on a user-provided logo has been applied.
--   **Content**: PDF guides (in EN/ES) have been generated with  and include a professional footer with a logo and QR codes. An endpoint exists to serve these PDFs.
--   **Admin**: An admin account has been created (/) and the TOTP secret was provided to the user.
+The project is a full-stack application with a React Native (Expo) frontend and a FastAPI backend. The codebase was recently restored to a previously functional state after a series of complex changes introduced critical bugs. On top of this restored base, the following fixes and features have been implemented:
+
+*   **Backend**:
+    *   The admin login has been fixed.
+    *   A system for serving unique postal codes per app with automatic weekly rotation is implemented and working.
+    *   An endpoint for manual code rotation by an admin has been added.
+    *   A new public endpoint () uses an LLM to find postal codes based on real-time web search after a user makes a purchase.
+    *   A static Privacy Policy page has been created and is served at .
+*   **Frontend**:
+    *   The code for a 48-hour purchase timer has been implemented in the  and , but it is **untested and high-risk**, as a similar implementation previously broke the app.
+    *   The text Google Voice has been updated to Free Phone Number across the app's translation files.
+    *   The  screen has been updated to call the new AI search endpoint after a successful payment verification.
+*   **Assets & Build Configuration**:
+    *   New, professional app icons have been generated and configured in .
+    *   PDF guides have been regenerated with the new, correct logo.
+    *    has been configured with a local keystore to build a signed AAB for the Google Play Store.
+    *    has been updated to  and includes the advertising ID permission to resolve Google Play Console errors.
 
 **Last working item**:
--   Last item agent was working: The agent was addressing two critical user complaints:
-    1.  The payment flow is not functional on the frontend; it only has a Simulate Payment button instead of a real Stripe payment form.
-    2.  The user is dissatisfied with the visual integration of the logo and color palette, requesting a more professional look.
--   Status: IN PROGRESS
--   Agent Testing Done: N
--   Which testing method agent to use? both
--   User Testing Done: N
+- Last item agent was working: Generating new Android builds (both APK and AAB) to address the errors reported from the Google Play Console. The  was updated to increment the  to  and add the required  permission. A new local keystore was also configured in .
+- Status: IN PROGRESS
+- Agent Testing Done: N
+- Which testing method agent to use? Manual testing by user. The agent should first check the status of the builds on the EAS website and provide the download links.
+- User Testing Done: N
 
 **All Pending/In progress Issue list**:
--   Issue 1: Implement a real Stripe payment form on the frontend. (P0)
--   Issue 2: Redesign the app's logo and color scheme to look more professional. (P1)
+- Issue 1: Core purchase functionality (48-hour access and state persistence) is likely broken or buggy. (P0)
+- Issue 2: Android builds (AAB and APK) need to be verified and delivered. (P1)
+- Issue 3: The iOS (IPA) build has not been generated. (P2)
+- Issue 4: The language selection button is not working in the web preview. (P3)
+- Issue 5: The app crashes or shows an error in Expo Go. (P0)
 
 **Issues Detail**:
--   **Issue 1**: Implement real Stripe payment form.
-    -   **Attempted fixes**: The agent installed  but has not implemented the client-side logic yet. The current implementation in  is a placeholder that does not collect card details.
-    -   **Next debug checklist**:
-        1.  Modify .
-        2.  Inside a , call the  backend endpoint to fetch the  for the payment.
-        3.  Use the  hook and initialize the  with the fetched .
-        4.  Replace the current payment button with one that triggers .
-        5.  Handle the payment result: on success, call a new backend endpoint (e.g., ) to confirm the payment on the server side.
-        6.  Only after successful server-side verification, grant access to the results by navigating to .
-    -   **Why fix this issue and what will be achieved with the fix?**: This is the core monetization feature of the app. Without it, the user cannot charge customers.
-    -   **Status**: NOT STARTED
-    -   **Is recurring issue?** N
-    -   **Should Test frontend/backend/both after fix?**: Both.
-    -   **Blocked on other issue**: None.
+- **Issue 1**: Core purchase functionality (48-hour access and state persistence) is likely broken or buggy.
+    - **Attempted fixes**: The agent completely overwrote  and  to add logic for storing purchase timestamps and calculating expirations. This exact action broke the app in a previous attempt, forcing a revert. The current implementation has not been tested.
+    - **Next debug checklist**:
+        1.  Verify the app loads correctly in Expo Go without crashing.
+        2.  Perform a test purchase for one app (e.g., Spark).
+        3.  After purchase, confirm the home screen  updates to show Spark as an active purchase with a countdown timer.
+        4.  Confirm you can navigate to the results screen for Spark.
+        5.  Return to the home screen and confirm you can still access the Spark results.
+        6.  **Completely close and restart the app.**
+        7.  Verify that Spark is still shown as an active purchase and is accessible without re-paying.
+        8.  Check  for logic errors in how  are stored and rehydrated from .
+    - **Why fix this issue and what will be achieved with the fix?**: This is the app's central business logic. Without it, the app is not functional.
+    - **Status**: IN PROGRESS
+    - **Is recurring issue?** Y
+    - **Should Test frontend/backend/both after fix?**: Both (Frontend is the primary area of concern).
+    - **Blocked on other issue**: Issue 5 (Expo Go crash). This must be fixed first to enable testing.
 
--   **Issue 2**: Redesign app logo and color scheme.
-    -   **Attempted fixes**: The agent applied a color palette extracted from the user's logo, but the user found the result unprofessional and not well-integrated.
-    -   **Next debug checklist**:
-        1.  Propose a new, more refined color palette based on the user's logo (Colors: Navy: , Cyan: , Silver: ).
-        2.  Either modify the existing logo () or generate a new one to better match the new color scheme.
-        3.  Update the styles in all relevant frontend files (, , , etc.) to apply the new design consistently.
-        4.  Update the PDF generation script () to use the new logo and colors for a cohesive brand identity.
-    -   **Why fix this issue and what will be achieved with the fix?**: To satisfy the user's requirement for a professional-looking application, which is crucial for user trust and adoption.
-    -   **Status**: IN PROGRESS
-    -   **Is recurring issue?** Y
-    -   **Should Test frontend/backend/both after fix?**: Frontend (screenshot tool).
-    -   **Blocked on other issue**: None.
+- **Issue 2**: Android builds (AAB and APK) need to be verified and delivered.
+    - **Attempted fixes**: The agent successfully initiated two new builds: one AAB ( profile, ) and one APK ( profile).
+    - **Next debug checklist**:
+        1.  Run An Expo user account is required to proceed.
+
+Log in to EAS with email or username (exit and run eas login --help to see other login options)
+Input is required, but stdin is not readable. Failed to display prompt: Email or username to check the status of the two most recent Android builds.
+        2.  If finished, get the download URL for the APK and the AAB.
+        3.  Provide both links to the user.
+    - **Why fix this issue and what will be achieved with the fix?**: Fulfills the user's direct request for updated builds to test and submit to Google Play.
+    - **Status**: USER VERIFICATION PENDING
+    - **Is recurring issue?** N
+    - **Should Test frontend/backend/both after fix?**: NA
+    - **Blocked on other issue**: None.
+
+- **Issue 3**: The iOS build (IPA) has not been generated.
+    - **Attempted fixes**: The agent attempted to start an iOS build, but it failed due to missing Apple Developer credentials. This task has been consistently postponed.
+    - **Next debug checklist**:
+        1.  Inform the user that to generate an IPA for TestFlight, they need to provide Apple Developer credentials or set them up in their Expo account.
+        2.  Once credentials are confirmed, run An Expo user account is required to proceed.
+
+Log in to EAS with email or username (exit and run eas login --help to see other login options)
+Input is required, but stdin is not readable. Failed to display prompt: Email or username.
+    - **Why fix this issue and what will be achieved with the fix?**: Fulfills the user's original request for an app on both platforms.
+    - **Status**: BLOCKED (on user credentials)
+    - **Is recurring issue?** Y
+    - **Should Test frontend/backend/both after fix?**: Frontend.
+    - **Blocked on other issue**: None.
+
+- **Issue 4**: The language selection button is not working in the web preview.
+    - **Attempted fixes**: The agent suspected it was a web preview-specific issue with  events and did not investigate further.
+    - **Next debug checklist**:
+        1.  Once Expo Go is working, test the language button on a mobile device.
+        2.  If it still fails, inspect the  handler for the language selector button in .
+        3.  Check the  function in  and the logic for the language selection modal.
+    - **Why fix this issue and what will be achieved with the fix?**: Enables the localization feature requested by the user.
+    - **Status**: NOT STARTED
+    - **Is recurring issue?** N
+    - **Should Test frontend/backend/both after fix?**: Frontend.
+    - **Blocked on other issue**: Issue 5 (Expo Go crash).
+
+- **Issue 5**: The app crashes or shows an error in Expo Go.
+    - **Attempted fixes**: The agent identified that the Hermes engine was causing issues in the development environment and disabled it in  by setting . However, the user's last message indicates Expo Go is still failing. The root cause is likely related to the recent major changes in  and .
+    - **Next debug checklist**:
+        1.  Start with the most recently modified files:  and .
+        2.  Wrap the main  in  with a  block to log any potential errors.
+        3.  Temporarily comment out the new 48-hour timer logic to see if the app loads. If it does, the bug is in that logic.
+        4.  Check for incorrect state initialization or race conditions related to  rehydration.
+    - **Why fix this issue and what will be achieved with the fix?**: The app cannot be tested on a mobile device until this is resolved.
+    - **Status**: IN PROGRESS
+    - **Is recurring issue?** Y
+    - **Should Test frontend/backend/both after fix?**: Frontend.
+    - **Blocked on other issue**: None. This is the primary blocker.
 
 **In progress Task List**:
--   None.
+- None.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   **(P2) Implement AI-Powered Zip Code Search**: Create a background task (e.g., using Celery or a simple script) that an admin can trigger. This task will use the Emergent LLM Key (OpenAI) to search the web for news and forum posts about gig app hiring freezes being lifted in certain areas, extract zip codes from the findings, and suggest them for addition to the database.
-    -   **(P3) Add Detailed Content to Guides**: The current PDF guides () contain placeholder text. This script needs to be updated with comprehensive, well-written, step-by-step instructions for signing up for Instacart, DoorDash, Spark Driver, and obtaining a Google Voice number.
-
--   **Future Tasks**:
-    -   None discussed yet.
+    -   (P3) Populate PDF guides with detailed, final content. The current guides are placeholders regenerated with the correct logo but lack real information. This involves updating the content inside the  script.
 
 **Completed work in this session**
--   Full project scaffolding (FastAPI backend, Expo frontend).
--   MongoDB schema and Pydantic models defined.
--   All required API endpoints for core functionality created.
--   Admin user creation with 2FA (TOTP) implemented and tested.
--   Live Stripe keys integrated; backend can create .
--   All required frontend screens and navigation created with .
--   Bilingual (EN/ES) support implemented using Zustand for state management.
--   PDF guides generated via a Python script, complete with a footer, logo, and QR codes.
--   An API endpoint  to serve the generated PDF guides.
+-   **Backend**:
+    -   Admin login functionality was successfully fixed and verified.
+    -   Postal codes are now unique for each app and rotate automatically weekly.
+    -   An AI-powered postal code search () is now triggered after a successful purchase.
+    -   A static Privacy Policy page was created and is served by the backend.
+-   **Frontend**:
+    -   The text for Google Voice was changed to Free Phone Number throughout the UI.
+-   **Assets & Build**:
+    -   New professional app icons were generated and correctly configured in .
+    -   PDF guides were regenerated to include the updated logo.
+    -   Android build configuration was updated to  and the advertising ID permission was added to fix Google Play Console errors.
+    -   A local Android keystore was generated and configured in  to enable AAB builds.
 
--   **Recently completed**:
-  -   Live Stripe key integration (DONE)
-  -   Admin account creation with 2FA (DONE)
-  -   PDF guide generation with branding (DONE)
-  -   Basic UI theming with logo colors (DONE, but requires rework)
+- **Recently completed**:
+  - Google Play Console build errors fixed (versionCode, AD_ID).
+  - Privacy Policy page created and served.
+  - AI-powered zip code search implemented.
+  - Admin login fixed.
+  - Postal code rotation and uniqueness implemented.
 
 **Earlier issues found/mentioned but not fixed**
--   A timeout was observed by the agent when using the screenshot tool on the  screen (). The agent ignored this and moved on. This might indicate a rendering or accessibility issue with the switch component on the web preview that could affect testing.
+-   The core issue of the app crashing in Expo Go and the purchase persistence logic being broken are the main unfixed items from this session.
 
 **Known issue recurrence from previous fork**
--   None.
+-   **Issue recurrence in previous fork**: The app breaking due to major changes in the state management () and home screen () is a recurring pattern. The agent reverted the code once but then re-implemented a similar high-risk change which is likely the cause of the current Expo Go crash.
+-   **Recurrence count**: 2
+-   **Status**: IN PROGRESS
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Frontend**: React Native, Expo, Expo Router (file-based routing), Zustand (state management), Axios (HTTP client), .
--   **Backend**: FastAPI, MongoDB (with  async driver), Pydantic (data validation),  (JWT for auth),  (2FA),  (PDF generation).
--   **Database**: MongoDB.
--   **Architecture**: Full-stack monorepo.
+-   **Frontend**: React Native, Expo, Expo Router, Zustand (with ), Axios.
+-   **Backend**: FastAPI, MongoDB (motor), Pydantic, Stripe API, .
+-   **AI**: OpenAI API for real-time web search to find postal codes.
+-   **Builds**: Expo Application Services (EAS).
 
 **key DB schema**
--   **admins**: 
--   **zip_codes**: 
 -   **payments**: 
--   **guides**: 
--   **terms**: 
+-   **rotation_status**:  (New collection to manage weekly code rotation)
+-   **admins**: 
 
 **changes in tech stack**
--   None. The stack is consistent with the initial setup.
+-   Integrated OpenAI via  for the AI search feature.
 
 **All files of reference**
--   : Contains the entire backend logic. Needs modification to add a payment verification endpoint.
--   : Needs a complete overhaul to implement the Stripe Payment Sheet.
--   : Needs to be updated with better branding and more detailed content.
--   , , , : These files need style updates for the new professional theme.
--   : Contains the LIVE Stripe keys. Do not expose them.
+-   : **Highest priority.** Recently overwritten to implement the 48-hour purchase timer. This is the most likely source of the current Expo Go crash.
+-   : **Highest priority.** Also overwritten to work with the new  logic. Contains UI for displaying timers and purchased apps.
+-   : Updated with ,  permission, new icon paths, and .
+-   : Modified to add AI search, static file serving for the privacy policy, and fixes for admin login and zip code rotation.
+-   : Updated to use a local keystore for Android builds.
 
 **Areas that need refactoring**:
--   The entire frontend payment flow in  needs to be refactored from a simulation to a real implementation.
+-   The state management in  and its usage in  is extremely fragile. It has been the source of major bugs twice. It needs to be simplified or debugged with extreme care, focusing on stability and correct rehydration from .
 
 **key api endpoints**
--   : Admin login.
--   : Creates a new admin (used for setup).
--   : Creates a Stripe Payment Intent.
--   : Gets zip codes for a specific app.
--   : Serves the generated PDF guides.
--   **NEEDS TO BE CREATED**: : An endpoint for the frontend to call after a successful Stripe payment to verify it on the backend and unlock content.
+-   
+-   
+-   : (NEW) Triggers an AI search for postal codes for a given app.
+-   : (NEW) Serves the static privacy policy file.
+-   
+-   : (NEW) Manually triggers the weekly zip code rotation.
 
 **Critical Info for New Agent**
--   **Stripe is LIVE**: The user has provided **LIVE** Stripe keys, which are configured in . All payment tests will interact with the user's actual Stripe account. Proceed with caution.
--   **Admin Credentials**: Admin login is  / . The TOTP secret  must be used with an authenticator app (like Google Authenticator) to get the 2FA code for login.
--   **Primary Goal**: The immediate priority is to fix the client-side payment flow. The user cannot currently accept payments, which is the app's core business model. This is P0.
--   **User Feedback**: The user is highly focused on a professional look and feel. The second priority (P1) is to address their dissatisfaction with the logo and color scheme.
+-   **Primary Blocker**: The app is currently crashing on Expo Go. Your first task is to fix this. The crash is almost certainly caused by the recent, untested changes to  and  related to the 48-hour purchase timer.
+-   **High-Risk Code**: Be extremely cautious when modifying  and . A previous agent broke the app with similar changes, forcing a full revert. Test every small change. Consider simplifying the logic (e.g., get the app loading first, then add the timer logic back piece by piece).
+-   **Builds are In Progress**: The previous agent started new AAB and APK builds. Your first action should be to check their status with An Expo user account is required to proceed.
+
+Log in to EAS with email or username (exit and run eas login --help to see other login options)
+Input is required, but stdin is not readable. Failed to display prompt: Email or username and provide the links to the user if they are ready.
+-   **Backend is Stable**: The backend has been tested and appears to be functioning correctly, including the new AI search and privacy policy features. Focus on the frontend first.
+-   **Environment**: The web preview environment is unstable due to  issues. Prioritize testing directly on a device using Expo Go once you fix the crash. The agent disabled Hermes for Android () which might be important for Expo Go stability in this environment.
 
 **documents created in this job**
 -   
 -   
--   
--   
--   
--   
--   
--   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Correct the payment flow (it's a simulation), and fix the logo/colors to be more professional. (IN PROGRESS)
-2.  **User**: Update PDF guides with logo colors, footer website, and QR codes for app stores. (COMPLETED, but will need rework after UI is updated)
-3.  **User**: Requesting final adjustments: integrate the logo/color palette, make guides more detailed, and ensure content is locked until payment is fully verified. (IN PROGRESS)
-4.  **User**: Provided the secret Stripe key  and asked for the app to be compiled for testing with admin access. (COMPLETED)
-5.  **User**: Provided the publishable Stripe key , a logo image, and asked for PDF guides to be generated. (COMPLETED)
-6.  **User**: Continue with the project and give me a final demo to download. (Work was in progress)
-7.  **User**: Chose OpenAI with Emergent LLM key, requested the AI search be a background task, and specified the app should be bilingual (EN/ES). (Acknowledged)
-8.  **User**: Clarified requirements: Stripe for payments, user/pass + 2FA for admin, manual + AI code updates, pay-per-consultation model, and added T&C page requirement. (Acknowledged)
+1.  **User**: Fix the errors reported by Google Play Console. (IN PROGRESS - Agent updated  and started new builds).
+2.  **User**: Set up the credentials for the AAB build. (COMPLETED - Agent created and configured a local keystore).
+3.  **User**: The last check failed, do a full review and generate the bundle for Google Play. (IN PROGRESS - Agent performed backend testing and started AAB build).
+4.  **User**: Payment confirmation is failing, the app is not navigating to the purchase screen, improve PDF guides, and fix  errors. (IN PROGRESS).
+5.  **User**: Continue with the work (after AI playbook was shown). (COMPLETED).
+6.  **User**: Add AI search for zip codes, fix 48h timer, fix return to home button, and change Google Voice text. (IN PROGRESS - Most changes were made but are buggy).
+7.  **User**: After purchase, the app doesn't show it as unlocked for 48 hours and doesn't allow buying other apps. (IN PROGRESS - This is the critical bug being worked on).
+8.  **User**: The last APK was functional, revert to that version and apply fixes. The app icon is wrong, the 48h timer is missing, the return button is needed, and codes must be different/rotate. (PARTIALLY COMPLETE - Agent reverted code but re-introduced buggy features).
+9.  **User**: The app isn't working in Expo Go; it shows the home screen without a logo, and buttons don't work. Use the last functional APK as a base. (IN PROGRESS - This led to the code revert).
+10. **User**: The Expo Go QR code gives an error (with screenshot). (IN PROGRESS - This is the current primary bug).
 
 **Project Health Check:**
--   **Broken**: The frontend payment flow is non-functional for real transactions.
--   **Mocked**: The payment screen () is currently a mock/simulation.
+-   **Broken**: The application is not functional on mobile (crashes in Expo Go). The core purchase and access-persistence logic is implemented but is the likely cause of the crash and has not been verified.
 
 **3rd Party Integrations**
--   **Stripe (Payments)** — requires User API Key (Live keys are integrated).
--   **OpenAI (for future AI search)** — uses Emergent LLM Key.
+-   **Stripe (Payments)** — requires User API Key.
+-   **Expo Application Services (EAS)** — requires User Account (Logged in with token).
+-   **OpenAI GPT-4o** — uses Emergent LLM Key (for AI-powered zip code search).
 
 **Testing status**
--   Testing agent used after significant changes: NO
--   Troubleshoot agent used after agent stuck in loop: NO
+-   Testing agent used after significant changes: YES (For backend, which passed).
+-   Troubleshoot agent used after agent stuck in loop: YES (For ngrok issue).
 -   Test files created: None.
--   Known regressions: None.
+-   Known regressions: The app's stability on mobile (Expo Go) has severely regressed. It was previously functional and now crashes on start.
 
 **Credentials to test flow:**
 -   **Admin Username**: 
 -   **Admin Password**: 
--   **Admin 2FA Secret**:  (Scan with Google Authenticator or similar)
+-   **Admin 2FA Secret**: 
 
 **What agent forgot to execute**
--   The agent did not fully implement the Stripe payment flow on the frontend, leaving it as a simulation.
--   The agent has not yet started work on the AI-powered zip code search feature.
--   The agent did not add detailed content to the generated PDF guides; they remain placeholders.
--   The agent observed a test failure/timeout on the terms screen switch but did not investigate or fix it.
+-   The agent never successfully generated an **iOS (IPA) build**.
+-   The agent did not fix the non-functional language selection button, dismissing it as a web-only issue without device testing.
+-   The agent did not populate the PDF guides with real, detailed content beyond placeholder text.
 
 </analysis>
-<SYS_PROMPT_SEPARATOR>
-
