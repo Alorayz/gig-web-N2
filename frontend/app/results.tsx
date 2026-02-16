@@ -165,7 +165,7 @@ export default function ResultsScreen() {
     <View style={styles.contentContainer}>
       <View style={styles.voiceHeader}>
         <Ionicons name="call" size={40} color={COLORS.accent} />
-        <Text style={styles.voiceTitle}>Google Voice</Text>
+        <Text style={styles.voiceTitle}>{language === 'en' ? 'Free Phone Number' : 'Número de Teléfono Gratis'}</Text>
         <Text style={styles.voiceSubtitle}>
           {language === 'en' ? 'Get a FREE second phone number' : 'Obtén un segundo número de teléfono GRATIS'}
         </Text>

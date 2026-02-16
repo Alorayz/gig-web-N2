@@ -104,7 +104,7 @@ export default function SelectAppScreen() {
           </Text>
           <IncludeItem text={language === 'en' ? '5 zip codes with high availability' : '5 códigos postales con alta disponibilidad'} />
           <IncludeItem text={language === 'en' ? 'Detailed step-by-step opening guide' : 'Guía detallada paso a paso de apertura'} />
-          <IncludeItem text={language === 'en' ? 'Google Voice free number guide' : 'Guía de número gratis Google Voice'} />
+          <IncludeItem text={language === 'en' ? 'Free phone number guide' : 'Guía de número de teléfono gratis'} />
           <IncludeItem text={language === 'en' ? 'PDF downloadable guides' : 'Guías descargables en PDF'} />
         </View>
       </ScrollView>
