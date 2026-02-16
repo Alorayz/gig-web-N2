@@ -82,7 +82,7 @@ const translations: Record<string, Record<string, string>> = {
     'results.title': 'Your Results',
     'results.zipCodes': 'Available Zip Codes',
     'results.guide': 'Opening Guide',
-    'results.voiceGuide': 'Google Voice Guide',
+    'results.voiceGuide': 'Free Phone Number Guide',
     'results.score': 'Availability Score',
     'results.noZipCodes': 'No zip codes available at this time',
     'results.tryAnother': 'Try Another App',
