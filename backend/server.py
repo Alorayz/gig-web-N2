@@ -32,7 +32,7 @@ db = client[os.environ.get('DB_NAME', 'gig_zipfinder')]
 
 # Helper function to serialize MongoDB documents
 def serialize_doc(doc):
-    """Convert MongoDB document to JSON-serializable dict"""
+    """Convert MongoDB document to JSON-serializable dict, excluding _id"""
     if doc is None:
         return None
     if isinstance(doc, list):
@@ -41,7 +41,7 @@ def serialize_doc(doc):
         result = {}
         for key, value in doc.items():
             if key == '_id':
-                result['_id'] = str(value)
+                continue  # Exclude MongoDB _id from response
             elif isinstance(value, datetime):
                 result[key] = value.isoformat()
             else:
