@@ -245,7 +245,7 @@ export default function HomeScreen() {
           />
           <FeatureItem
             icon="call"
-            text={language === 'en' ? 'Free Google Voice Number' : 'Número Google Voice Gratis'}
+            text={language === 'en' ? 'Free Phone Number' : 'Número de Teléfono Gratis'}
             color={COLORS.accent}
             isActive={false}
           />
