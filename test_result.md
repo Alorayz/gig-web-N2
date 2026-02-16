@@ -149,6 +149,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ VERIFIED: All apps (spark, doordash, instacart) return different zip codes as required. Spark: ['64101', '68102', '74103'], DoorDash: ['80202', '85001', '84101'], Instacart: ['10001', '60614', '33139']"
+      - working: true
+        agent: "testing"
+        comment: "✅ CRITICAL FIX: Found duplicate zip code '60614' between spark and instacart. Removed duplicate from instacart and added replacement '33133' (Miami Beach, FL). Verified all apps now return unique zip codes: Spark: ['30301','30339','75201','27513','60614'], DoorDash: ['80202','85001','84101','87102','79901'], Instacart: ['10001','33139','94014','75214','92101']"
 
   - task: "Guides API"
     implemented: true
