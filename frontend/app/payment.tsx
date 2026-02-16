@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { createCheckoutSession, verifyCheckoutSession, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
+import { createCheckoutSession, verifyCheckoutSession, getZipCodesByApp, getGuidesByApp, searchZipCodesWithAI } from '../src/services/api';
 
 export default function PaymentScreen() {
   const router = useRouter();
