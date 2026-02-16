@@ -1528,6 +1528,20 @@ async def seed_initial_data():
 async def root():
     return {"message": "GIG ZipFinder API v1.0", "status": "active"}
 
+# Serve Privacy Policy
+STATIC_DIR = Path(__file__).parent / "static"
+
+@api_router.get("/privacy-policy.html")
+async def get_privacy_policy():
+    """Serve the Privacy Policy page"""
+    privacy_file = STATIC_DIR / "privacy-policy.html"
+    if privacy_file.exists():
+        return FileResponse(
+            path=str(privacy_file),
+            media_type="text/html"
+        )
+    raise HTTPException(status_code=404, detail="Privacy Policy not found")
+
 @api_router.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
