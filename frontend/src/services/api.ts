@@ -54,6 +54,12 @@ export const getZipCodesByApp = async (appName: string) => {
   return response.data;
 };
 
+// AI Search for Zip Codes - called after purchase
+export const searchZipCodesWithAI = async (appName: string) => {
+  const response = await api.post(`/search-zip-codes/${appName}`);
+  return response.data;
+};
+
 // Guides API
 export const getGuidesByApp = async (appName: string) => {
   const response = await api.get(`/guides/${appName}`);
