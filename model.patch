@@ -1,56 +1,162 @@
 diff --git a/model.patch b/model.patch
-index 9798261..e69de29 100644
+index 2766a7e..e69de29 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,51 +0,0 @@
--diff --git a/backend/server.py b/backend/server.py
--index 793a941..e02270e 100644
----- a/backend/server.py
--+++ b/backend/server.py
--@@ -356,6 +356,46 @@ async def check_payment_by_email(email: str, app_name: str):
--     except stripe.error.StripeError as e:
--         raise HTTPException(status_code=400, detail=str(e))
-- 
--+@api_router.get("/stripe/check-payment-by-user/{user_id}")
--+async def check_payment_by_user_id(user_id: str, app_name: str):
--+    """Check if a payment exists for a user_id and app"""
--+    try:
--+        # First check our database for payments
--+        payment = await db.payments.find_one({
--+            "user_id": user_id,
--+            "app_name": app_name.lower(),
--+            "status": "succeeded"
--+        })
--+        
--+        if payment:
--+            return {
--+                "found": True,
--+                "status": "succeeded",
--+                "payment_id": payment.get("id"),
--+                "stripe_payment_intent_id": payment.get("stripe_payment_intent_id")
--+            }
--+        
--+        # Also search Stripe sessions by metadata
--+        sessions = stripe.checkout.Session.list(
--+            limit=10,
--+            expand=['data.payment_intent']
--+        )
--+        
--+        for session in sessions.data:
--+            if session.payment_status == 'paid':
--+                metadata = session.metadata or {}
--+                if (metadata.get('user_id') == user_id and 
--+                    metadata.get('app_name', '').lower() == app_name.lower()):
--+                    return {
--+                        "found": True,
--+                        "status": "succeeded",
--+                        "session_id": session.id
--+                    }
--+        
--+        return {"found": False, "status": "not_found"}
--+    except stripe.error.StripeError as e:
--+        raise HTTPException(status_code=400, detail=str(e))
--+
-- # ============== ZIP CODES ROUTES ==============
-- 
-- @api_router.get("/zip-codes/{app_name}")
+@@ -1,56 +0,0 @@
+-diff --git a/model.patch b/model.patch
+-index 9798261..e69de29 100644
+---- a/model.patch
+-+++ b/model.patch
+-@@ -1,51 +0,0 @@
+--diff --git a/backend/server.py b/backend/server.py
+--index 793a941..e02270e 100644
+----- a/backend/server.py
+--+++ b/backend/server.py
+--@@ -356,6 +356,46 @@ async def check_payment_by_email(email: str, app_name: str):
+--     except stripe.error.StripeError as e:
+--         raise HTTPException(status_code=400, detail=str(e))
+-- 
+--+@api_router.get("/stripe/check-payment-by-user/{user_id}")
+--+async def check_payment_by_user_id(user_id: str, app_name: str):
+--+    """Check if a payment exists for a user_id and app"""
+--+    try:
+--+        # First check our database for payments
+--+        payment = await db.payments.find_one({
+--+            "user_id": user_id,
+--+            "app_name": app_name.lower(),
+--+            "status": "succeeded"
+--+        })
+--+        
+--+        if payment:
+--+            return {
+--+                "found": True,
+--+                "status": "succeeded",
+--+                "payment_id": payment.get("id"),
+--+                "stripe_payment_intent_id": payment.get("stripe_payment_intent_id")
+--+            }
+--+        
+--+        # Also search Stripe sessions by metadata
+--+        sessions = stripe.checkout.Session.list(
+--+            limit=10,
+--+            expand=['data.payment_intent']
+--+        )
+--+        
+--+        for session in sessions.data:
+--+            if session.payment_status == 'paid':
+--+                metadata = session.metadata or {}
+--+                if (metadata.get('user_id') == user_id and 
+--+                    metadata.get('app_name', '').lower() == app_name.lower()):
+--+                    return {
+--+                        "found": True,
+--+                        "status": "succeeded",
+--+                        "session_id": session.id
+--+                    }
+--+        
+--+        return {"found": False, "status": "not_found"}
+--+    except stripe.error.StripeError as e:
+--+        raise HTTPException(status_code=400, detail=str(e))
+--+
+-- # ============== ZIP CODES ROUTES ==============
+-- 
+-- @api_router.get("/zip-codes/{app_name}")
+diff --git a/test_result.md b/test_result.md
+index d624227..e875721 100644
+--- a/test_result.md
++++ b/test_result.md
+@@ -116,6 +116,9 @@ backend:
+       - working: true
+         agent: "main"
+         comment: "Health endpoint returns active status"
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: Health check endpoint responding with 200 status and valid JSON"
+ 
+   - task: "Seed Data API"
+     implemented: true
+@@ -128,6 +131,9 @@ backend:
+       - working: true
+         agent: "main"
+         comment: "Seeds zip codes, guides, and terms to MongoDB"
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: Seed data endpoint successfully initializes database with zip codes and guides"
+ 
+   - task: "Zip Codes API"
+     implemented: true
+@@ -140,6 +146,9 @@ backend:
+       - working: true
+         agent: "main"
+         comment: "Returns zip codes by app with availability scores"
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: All apps (spark, doordash, instacart) return different zip codes as required. Spark: ['64101', '68102', '74103'], DoorDash: ['80202', '85001', '84101'], Instacart: ['10001', '60614', '33139']"
+ 
+   - task: "Guides API"
+     implemented: true
+@@ -152,6 +161,9 @@ backend:
+       - working: true
+         agent: "main"
+         comment: "Returns step-by-step guides for each app"
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: Guides endpoint returns 4 comprehensive guides for Spark with bilingual content"
+ 
+   - task: "Terms API"
+     implemented: true
+@@ -164,10 +176,13 @@ backend:
+       - working: true
+         agent: "main"
+         comment: "Returns bilingual terms and conditions"
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: Terms endpoint returns complete bilingual terms (English and Spanish content present)"
+ 
+   - task: "Stripe Payment Intent API"
+     implemented: true
+-    working: "demo_mode"
++    working: true
+     file: "/app/backend/server.py"
+     stuck_count: 0
+     priority: "high"
+@@ -176,6 +191,9 @@ backend:
+       - working: "demo_mode"
+         agent: "main"
+         comment: "Stripe integration ready - requires valid API keys for production"
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: Stripe integration fully operational with LIVE keys. Checkout session creation working, config endpoint returns publishable key, paid apps tracking functional"
+ 
+   - task: "Admin Registration with 2FA"
+     implemented: true
+@@ -212,6 +230,21 @@ backend:
+       - working: true
+         agent: "main"
+         comment: "Uses OpenAI GPT-4 via Emergent LLM Key to find zip codes"
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: AI search endpoint fully functional with GPT-4 integration. Returns 5 AI-generated zip codes with proper fallback mechanism"
++
++  - task: "Admin Zip Code Rotation"
++    implemented: true
++    working: true
++    file: "/app/backend/server.py"
++    stuck_count: 0
++    priority: "medium"
++    needs_retesting: false
++    status_history:
++      - working: true
++        agent: "testing"
++        comment: "✅ VERIFIED: Admin rotation check endpoint working. Current week set: 0, automatic weekly rotation configured"
+ 
+ frontend:
+   - task: "Home Screen with Language Selector"
+@@ -315,4 +348,6 @@ agent_communication:
+   - agent: "main"
+     message: "MVP completed with all core features. Stripe integration is in demo mode until user provides valid API keys."
+   - agent: "main"
+-    message: "Implemented real Stripe payment flow with card input form for web. Updated logo to professional icon-based design with location pin and arrow motif. Backend creates real PaymentIntents with LIVE Stripe keys. Frontend uses Stripe.js for web payment processing."
+\ No newline at end of file
++    message: "Implemented real Stripe payment flow with card input form for web. Updated logo to professional icon-based design with location pin and arrow motif. Backend creates real PaymentIntents with LIVE Stripe keys. Frontend uses Stripe.js for web payment processing."
++  - agent: "testing"
++    message: "Comprehensive backend testing completed. All 12 critical endpoints tested successfully. Key findings: (1) Different zip codes confirmed for each app (spark, doordash, instacart), (2) Stripe checkout session creation working with live keys, (3) AI search endpoint functioning with real GPT-4 integration, (4) All endpoints returning proper 200 status codes. Backend is fully operational and ready for production use."
+\ No newline at end of file
