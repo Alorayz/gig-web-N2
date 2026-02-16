@@ -73,7 +73,7 @@ const translations: Record<string, Record<string, string>> = {
     'payment.includes': 'Your purchase includes:',
     'payment.item1': '5 zip codes with high availability potential',
     'payment.item2': 'Comprehensive step-by-step account opening guide',
-    'payment.item3': 'Complete Google Voice free phone number guide',
+    'payment.item3': 'Complete free phone number guide',
     'payment.success': 'Payment Successful!',
     'payment.failed': 'Payment Failed',
     'payment.tryAgain': 'Please try again',
