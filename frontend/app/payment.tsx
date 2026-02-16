@@ -190,9 +190,9 @@ export default function PaymentScreen() {
       setPaymentIntentId(currentSessionId);
       setPaymentComplete(true);
       
-      // Save this app as paid
+      // Save this app as purchased with 48h expiration
       if (selectedApp) {
-        addPaidApp(selectedApp);
+        addPurchase(selectedApp);
       }
       
       const [zipCodesData, guidesData, voiceGuidesData] = await Promise.all([
