@@ -164,7 +164,7 @@ const translations: Record<string, Record<string, string>> = {
     'results.title': 'Tus Resultados',
     'results.zipCodes': 'Códigos Postales Disponibles',
     'results.guide': 'Guía de Apertura',
-    'results.voiceGuide': 'Guía Google Voice',
+    'results.voiceGuide': 'Guía Número Gratuito',
     'results.score': 'Puntuación de Disponibilidad',
     'results.noZipCodes': 'No hay códigos postales disponibles en este momento',
     'results.tryAnother': 'Probar Otra App',
