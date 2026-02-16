@@ -25,11 +25,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0f0f1a"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.gigzipfinder.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "com.google.android.gms.permission.AD_ID"
       ],
       "intentFilters": [
         {
