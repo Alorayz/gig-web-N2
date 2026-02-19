@@ -4,7 +4,9 @@ WORKDIR /app
 
 # Copy backend files
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install dependencies with special index for emergentintegrations
+RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
 
 COPY backend/ .
 
