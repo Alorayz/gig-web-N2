@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://gig-postal-guide.preview.emergentagent.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://gig-code-finder.preview.emergentagent.com';
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,

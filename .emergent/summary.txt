@@ -1,202 +1,162 @@
-<analysis>
-
-**original_problem_statement:**
-The user wants to create a mobile application for Android and iOS that provides guides and postal codes for gig economy apps. The user has reported a list of critical bugs and requested new features.
+<analysis>**original_problem_statement:**
+The user wants to create a mobile application for Android and iOS that provides guides and postal codes for gig economy apps (Instacart, DoorDash, Spark Driver).
 
 PRODUCT REQUIREMENTS & BUG FIXES:
-1.  **Core Feature**: Provide users with 5 postal codes for US cities with high demand for gig apps (Instacart, DoorDash, Spark Driver).
-2.  **AI-Powered Postal Codes**: Upon a user's purchase, use an AI to search the internet and suggest 5 relevant postal codes in real-time.
-3.  **Distinct & Rotating Codes**: Postal codes must be different for each gig app and should rotate automatically every week.
-4.  **Purchase Expiration**: After a purchase, the user gets access to the content for 48 hours. A timer should be visible. After 48 hours, the content must be locked again. The user must be able to access purchased content anytime within the 48-hour window.
-5.  **User Flow**:
-    *   A user pays , chooses a gig app, and gets access to the codes and guides.
-    *   The purchase is remembered for 48 hours.
-    *   There must be a Return to Home button after viewing results to allow the user to purchase another app's guide.
-6.  **Admin Panel**:
-    *   The admin login must be fixed.
-    *   The admin should be able to see payments and manually trigger the weekly postal code rotation.
-7.  **Branding & UI**:
-    *   The app's logo must appear correctly as the app icon/thumbnail on Android and iOS devices.
-    *   The logo in the generated PDF guides must be updated to match the app's logo.
-    *   The text Google Voice should be changed to Free Phone Number.
-    *   The language selection button should function correctly.
-8.  **App Stability**: Fix crashes or hangs that occur when trying to access purchased content or make a new purchase.
-9.  **Legal**: Create and host a Privacy Policy page accessible via a URL, compliant with US law.
-10. **Builds**:
-    *   Provide a QR code for testing with Expo Go.
-    *   Generate a new APK for Android.
-    *   Generate a new AAB (Android App Bundle) for the Google Play Console, fixing reported errors ( and Advertising ID).
-    *   Generate an IPA for iOS.
+1.  **Core Feature**: Provide users with 5 AI-generated postal codes for US cities with high demand for gig apps upon purchase.
+2.  **Distinct & Rotating Codes**: Postal codes must be different for each gig app and should rotate automatically every week.
+3.  **Purchase Expiration**: After a  purchase, the user gets access for 48 hours, with a visible timer.
+4.  **User Flow**: A user pays, chooses an app, gets content, and can return to the home screen. The purchase is remembered for 48 hours.
+5.  **Admin Panel**: Admin login must be fixed. The admin should be able to see payments and manually trigger postal code rotation.
+6.  **Branding & UI**: The app's logo must appear correctly. Text Google Voice should be Free Phone Number. The language selection button must work.
+7.  **App Stability**: Fix crashes when accessing purchased content or making a new purchase.
+8.  **Legal**: A Privacy Policy page must be accessible.
+9.  **Builds**: Generate a QR code for Expo Go, a new APK, a new AAB (fixing  and signing errors), and an IPA for iOS.
 
 **User's preferred language**: Spanish
 
 **what currently exists?**
-The project is a full-stack application with a React Native (Expo) frontend and a FastAPI backend. The backend is stable, with functioning admin, AI search, and zip code rotation features. In this session, the agent fixed a bug where the Privacy Policy page was not being served by adding the necessary endpoint to the backend server. The frontend web preview is loading correctly, but the core mobile app functionality remains untested and is presumed to be unstable due to previous issues with state management changes for the 48-hour timer. The primary focus of the session was on generating Android builds, which ultimately failed due to a critical signing certificate issue.
+The project is a full-stack application with a React Native (Expo) frontend and a FastAPI backend. The critical Android AAB signing issue that blocked all previous progress has been **resolved**, and the user successfully uploaded the new build to the Google Play Store. The backend APIs have been fully tested and passed. The application's backend is currently being migrated from the agent's temporary preview server to a permanent, autonomous setup on Railway with a MongoDB Atlas database, a process that is currently in progress. The mobile app itself is presumed to be unstable and crashes on launch, which is the next major code-level issue to resolve.
 
 **Last working item**:
-- Last item agent was working: The agent was attempting to resolve a critical build-stopper: The Android AAB generated was rejected by the Google Play Store because it was signed with a different certificate (keystore) than the one used for the initial app submission.
-- Status: BLOCKED
+- Last item agent was working: Guiding the user through the process of deploying the backend to a permanent hosting service (Railway) to make the application autonomous. The agent has already prepared the necessary files (, , ) and received the MongoDB Atlas credentials from the user.
+- Status: IN PROGRESS
 - Agent Testing Done: N
-- Which testing method agent to use? NA. This is a build configuration and credential issue, not a code testing issue. The next step is human interaction.
-- User Testing Done: Y (The user attempted to upload the AAB to Google Play and reported the signing certificate error).
+- Which testing method agent to use? After deployment, the agent needs to update the frontend's backend URL, then use Expo Go (QR code) to test the mobile app on a device.
+- User Testing Done: N
 
 **All Pending/In progress Issue list**:
-- Issue 1: **Incorrect Android App Signing Certificate (P0)**
-- Issue 2: App crashes or shows an error in Expo Go (P0)
-- Issue 3: Core purchase functionality (48-hour access) is buggy/untested (P0)
-- Issue 4: iOS build (IPA) has not been generated (P2)
-- Issue 5: The language selection button is untested on mobile (P3)
+-   Issue 1: Complete Backend Deployment to Railway (P0)
+-   Issue 2: App crashes or shows an error in Expo Go (P0)
+-   Issue 3: Core purchase functionality (48-hour access) is buggy/untested on mobile (P1)
+-   Issue 4: Generate iOS build (IPA) (P2)
+-   Issue 5: The language selection button is untested on mobile (P3)
 
 **Issues Detail**:
-- **Issue 1**: Incorrect Android App Signing Certificate
-    - **Description**: The app cannot be updated on the Google Play Store. The AAB generated by the agent was signed with a newly created keystore (). Google Play rejected it because the signature's SHA1 hash does not match the SHA1 of the *original* keystore used to upload the first version of the app. The original keystore file appears to be lost.
-    - **Attempted fixes**:
-        1. Built with a new local keystore (). This produced the error.
-        2. Switched  to , hoping the original key was stored on Expo's servers. This failed as no remote keystore was found for the project.
-    - **Next debug checklist**:
-        1.  Explain to the user that the original  file is essential for app updates and appears to be lost.
-        2.  Instruct the user to search all previous development computers/backups for this file.
-        3.  If the file is permanently lost, inform the user that the only way forward is to follow **Google Play's official process for resetting a lost upload key**. This involves them generating a new key, creating a PEM certificate from it, and contacting Google Play support to have them replace the key on their end.
-        4.  Once the key is found or reset by Google, configure  to use it and generate a new AAB.
-    - **Why fix this issue and what will be achieved with the fix?**: This is the primary blocker. Without resolving this, the user cannot publish any updates to their existing app on the Google Play Store.
-    - **Status**: BLOCKED
-    - **Is recurring issue?** N (but it is a critical one-time failure)
-    - **Should Test frontend/backend/both after fix?**: NA (This is a build/deployment issue).
-    - **Blocked on other issue**: Blocked on user action (finding the key or contacting Google support).
+-   **Issue 1**: Complete Backend Deployment to Railway
+    -   **Description**: The app's backend depends on the agent's temporary preview server. To make the app autonomous, it must be deployed to a permanent server.
+    -   **Attempted fixes**: The agent has prepared the codebase for deployment and has the user's MongoDB Atlas credentials.
+    -   **Next debug checklist**:
+        1.  Provide the user with step-by-step instructions to create a project on Railway, connect their GitHub, and add all necessary environment variables (, , etc.).
+        2.  Obtain the new public backend URL from the user after a successful deployment.
+        3.  Update  in  with the new URL.
+        4.  Build a new APK to confirm the frontend can communicate with the new permanent backend.
+    -   **Why fix this issue and what will be achieved with the fix?**: This will make the application fully independent and functional without the agent's environment being active.
+    -   **Status**: IN PROGRESS
+    -   **Is recurring issue?**: N
+    -   **Should Test frontend/backend/both after fix?**: Both.
+    -   **Blocked on other issue**: None.
 
-- **Issue 2**: App crashes or shows an error in Expo Go
-    - **Attempted fixes**: None in this session. The issue was identified in the previous session summary. The root cause is believed to be the high-risk changes made to  and  for the 48-hour timer.
-    - **Next debug checklist**:
-        1. Start the app in Expo Go and confirm the crash.
-        2. Examine the device logs for the crash reason.
-        3. Temporarily comment out the new timer/purchase persistence logic in  and  to isolate the problem.
-    - **Why fix this issue and what will be achieved with the fix?**: The app cannot be tested on a mobile device until this is resolved. It blocks verification of all other frontend features.
-    - **Status**: NOT STARTED
-    - **Is recurring issue?** Y
-    - **Should Test frontend/backend/both after fix?**: Frontend.
-    - **Blocked on other issue**: None.
-
-- **Issue 3**: Core purchase functionality (48-hour access) is buggy/untested
-    - **Attempted fixes**: The code was implemented in a previous session but is the likely cause of the Expo Go crash. It has not been tested.
-    - **Next debug checklist**: This can only be tested after Issue 2 (Expo Go crash) is resolved.
-    - **Why fix this issue and what will be achieved with the fix?**: This is the app's central business logic.
-    - **Status**: NOT STARTED
-    - **Is recurring issue?** Y
-    - **Should Test frontend/backend/both after fix?**: Frontend.
-    - **Blocked on other issue**: Issue 2 (App crashes in Expo Go).
-
-- **Issue 4**: iOS build (IPA) has not been generated
-    - **Attempted fixes**: None in this session. Postponed due to focus on Android.
-    - **Next debug checklist**: Confirm with the user if they have Apple Developer credentials ready.
-    - **Why fix this issue and what will be achieved with the fix?**: Fulfills the user's request for an iOS version.
-    - **Status**: NOT STARTED
-    - **Is recurring issue?** Y
-    - **Should Test frontend/backend/both after fix?**: Frontend.
-    - **Blocked on other issue**: Blocked on user providing Apple Developer credentials.
-
-- **Issue 5**: The language selection button is untested on mobile
-    - **Attempted fixes**: None. Dismissed as a web-only issue previously.
-    - **Next debug checklist**: Test on a device once Expo Go is working.
-    - **Status**: NOT STARTED
-    - **Is recurring issue?** N
-    - **Should Test frontend/backend/both after fix?**: Frontend.
-    - **Blocked on other issue**: Issue 2 (App crashes in Expo Go).
+-   **Issue 2**: App crashes or shows an error in Expo Go
+    -   **Description**: The mobile app is believed to crash on launch, preventing any testing or verification of frontend features. The issue is likely related to state management changes in .
+    -   **Next debug checklist**:
+        1.  After the backend is deployed, start the app via Expo Go.
+        2.  Reproduce the crash and examine device logs to identify the specific error.
+        3.  Investigate and refactor the state management logic in  and its usage in components like .
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical blocker that makes the mobile app unusable. Fixing it will allow for testing of all mobile-specific functionality.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: Y
+    -   **Should Test frontend/backend/both after fix?**: Frontend.
+    -   **Blocked on other issue**: Issue 1 (Complete Backend Deployment to Railway).
 
 **In progress Task List**:
-- None.
+-   **Task 1**: Guide user through Railway deployment
+    -   **Where to resume**: The user has provided credentials and is waiting for the final instructions on how to set up the project and environment variables in Railway.
+    -   **What will be achieved with this?**: A permanently hosted, autonomous backend.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: Both.
+    -   **Blocked on something**: Waiting to provide instructions to the user.
 
 **Upcoming and Future Tasks**
-- **Upcoming Tasks**:
-    - (P3) Populate PDF guides with detailed, final content by updating the  script.
+-   **Upcoming Tasks**:
+    -   (P0) Update  in the frontend and build a new APK pointing to the permanent Railway backend.
+    -   (P1) Generate the iOS build (IPA) once the user provides Apple Developer credentials.
+-   **Future Tasks**:
+    -   (P2) Populate PDF guides with final content by updating the  script.
+    -   (P2) Test and verify the 48-hour purchase timer logic once the app is stable.
+    -   (P3) Test the language selection on a mobile device.
 
 **Completed work in this session**
-- **Backend**:
-  - Fixed the Privacy Policy page by adding the  endpoint to  to serve the static file.
+-   **RESOLVED**: Fixed the critical Android AAB signing error by generating and guiding the user to upload a Play Console upload key (). The user confirmed the new AAB was accepted by Google Play.
+-   **Backend**: Fully tested all backend APIs using the testing agent, with 100% of tests passing.
+-   **Backend**: Prepared the entire backend codebase for permanent deployment on Railway by creating , , and updating  and .
+-   **Frontend**: Corrected hardcoded Google Voice text to Free Phone Number.
 
 **Earlier issues found/mentioned but not fixed**
-- The critical issues of the app crashing on Expo Go and the untested/buggy 48-hour purchase logic were carried over from the previous session and were not addressed, as the agent was completely occupied by the build failures.
+-   The critical issue of the app crashing on Expo Go was carried over and not addressed, as the agent was focused on the deployment blockers.
 
 **Known issue recurrence from previous fork**
-- **Issue recurrence in previous fork**: Major changes to state management () breaking the app is a known pattern. The current suspected crash is a result of this.
-- **Recurrence count**: 2
-- **Status**: IN PROGRESS
+-   **Issue recurrence in previous fork**: Fragile state management in  causing the app to break.
+-   **Recurrence count**: 2
+-   **Status**: IN PROGRESS (The current crash is a suspected recurrence).
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Frontend**: React Native, Expo, Expo Router, Zustand
-- **Backend**: FastAPI, MongoDB
-- **Builds**: Expo Application Services (EAS)
-- **Deployment**: Google Play Store (for AAB)
+-   **Frontend**: React Native, Expo, Zustand
+-   **Backend**: FastAPI
+-   **Database**: MongoDB Atlas (New)
+-   **Builds**: Expo Application Services (EAS)
+-   **Deployment**: Google Play Store, Railway (In Progress)
 
 **key DB schema**
-- No changes made. , ,  tables are the same.
+- No changes to schema. The data is now intended to be stored in the user's MongoDB Atlas cluster.
 
 **changes in tech stack**
-- None.
+-   **Backend Hosting**: Migrating from temporary preview server to a permanent **Railway** instance.
+-   **Database**: Migrating from a temporary instance to a permanent **MongoDB Atlas** cluster.
 
 **All files of reference**
-- : Heavily modified during attempts to fix the build. The  is the key property related to the main blocker.
-- : Modified multiple times to change  and build properties trying to fix EAS builds.
-- : Modified to add the  endpoint.
-- : The newly created keystore file that is **not** the correct one for Google Play updates.
+-   : Modified to be deployment-ready.
+-   : New file created for Railway.
+-   : This file must be updated with the new Railway backend URL.
+-   , : These files are the most likely cause of the mobile app crash and need investigation.
 
 **Areas that need refactoring**:
-- The state management in  and its usage in  remains extremely fragile and is the likely cause of the app crash. It needs to be stabilized before any other frontend work.
+-   The state management in  is fragile and needs to be stabilized to prevent the app from crashing.
 
 **key api endpoints**
-- : (NEWLY FIXED) Serves the static privacy policy file.
-- All other endpoints remain the same.
+- The backend API endpoints will be hosted on the new permanent Railway URL once deployed.
 
 **Critical Info for New Agent**
-- **IMMEDIATE BLOCKER**: You CANNOT update the app on Google Play. The AAB build was rejected for an invalid signature. The original keystore file is lost. Your first and only priority for the Android build is to guide the user through Google Play's lost key recovery process. Do not attempt to build a new AAB until the user confirms they have either found the original key or had Google Support reset it.
-- **Underlying Instability**: Do not be fooled by the working web preview. The mobile app is presumed to be non-functional (crashes on start in Expo Go). This is a P0 bug that needs to be fixed before any features can be tested on a device. The likely culprits are  and .
-- **Build Configuration**: The previous agent struggled with EAS builds. The configuration that finally worked (before the signing key issue was found) involved simplifying  and removing the  plugin. This may be a useful reference later.
-- **User Context**: The user is focused on getting a working AAB. You must manage their expectations and clearly explain why the signing key issue is a hard stop that requires their action outside of this environment.
+-   **Priority 1: Finish Deployment**: Your immediate task is to guide the user through the final Railway deployment steps. You have the . You need to give them the list of other environment variables to add.
+-   **The Build Blocker is SOLVED**: Do not investigate the Android signing key issue. It is fixed. New builds should work.
+-   **Priority 2: Fix the Mobile Crash**: After the backend is live, the very next step is fixing the app crash. The app is unusable on mobile. Generate a QR code for Expo Go, reproduce the crash, and debug .
+-   **Get the New Backend URL**: After the user confirms successful deployment on Railway, you MUST get the new public URL from them to update  and build a working app.
 
-**documents created in this job**
-- None.
+**documents and test reports created in this job**
+-   
+-   
 
 **Last 10 User Messages and any pending HUMAN messages**
-10. **User**: Tu creaste las firmas buscala en las primeras abb creadas en los servidores (You created the signatures, look for them in the first AABs created on the servers). -> **Status**: Agent investigated and found this wasn't possible; the key wasn't on EAS.
-9. **User**: Provides an image of credentials. -> **Status**: Agent noted they were the same as the new, incorrect keystore.
-8. **User**: La aplicación está dando errores, y el aab da este error... (The application has errors, and the AAB gives this error...). Reports the Google Play signing key error with a screenshot. -> **Status**: This is the current main blocker.
-7. **User**: Provides a list of keystore passwords. -> **Status**: Agent understood the issue is the file, not the passwords.
-6. **User**: Dame los aab y apk android nuevas corregidos sin errores (Give me the new, corrected, error-free Android AAB and APK). -> **Status**: Agent attempted this, leading to the signing key discovery.
-5. **User**: Conta los trabajos pendientes (List the pending jobs). -> **Status**: Agent provided a summary.
-4. **User**: Provides an Expo authentication token. -> **Status**: Completed. Agent used it to log in.
-3. **User**: Has las pruebas y genera la nueva apk y las aab de Android... (Do the tests and generate the new APK and AAB for Android...). -> **Status**: This initiated the entire build process.
-2.  **User**: Asks for the privacy policy URL. -> **Status**: Completed.
-1. **User**: El AAB todavía está en progreso. Voy a verificar una vez más: -> This is an agent message, not a user one.
+-   **User**: Continua con lo pendiente (Continue with what's pending) -> User is ready to proceed with the Railway deployment.
+-   **User**: no tengo cuenta dame los pasos para crear una (I don't have an account, give me the steps) -> User asking for instructions for Railway.
+-   **User**: Provides MongoDB Atlas credentials.
+-   **User**: si funciono (yes it worked) -> Confirmed the AAB was accepted by Google Play.
+-   **User**: verifica por ultima ves que toda la app este funcionando bien... (verify one last time that the whole app is working well...) -> Prompted the full app check.
+-   **User**: cuando el agente esta inactivo o en suspencion la aplicacion fallla... (when the agent is inactive or suspended the application fails...) -> The message that initiated the migration to a permanent server.
 
 **Project Health Check:**
-- **Broken**: The project is in a critical state. It's impossible to deploy updates to Android users, and the mobile app itself is likely non-functional due to crashes.
+-   **Broken**: The core mobile application is non-functional due to a crash on launch.
+-   **Mocked**: The backend is in the process of being migrated from a temporary server to a permanent one on Railway.
 
 **3rd Party Integrations**
-- **Stripe (Payments)** — requires User API Key.
-- **Expo Application Services (EAS)** — requires User Account (Logged in with token).
-- **OpenAI GPT-4o** — uses Emergent LLM Key.
-- **Google Play Console** - This is where the core deployment issue lies.
+-   **Stripe (Payments)** — requires User API Key.
+-   **Expo Application Services (EAS)** — requires User Account.
+-   **OpenAI GPT-4o** — uses Emergent LLM Key.
+-   **Google Play Console** — Integrated for deployment.
+-   **Railway (Hosting)** — Integration in progress.
+-   **MongoDB Atlas (Database)** — Integration in progress.
 
 **Testing status**
-- Testing agent used after significant changes: NO (Only backend testing was done at the start).
-- Troubleshoot agent used after agent stuck in loop: YES (Used for the EAS Build failures).
-- Test files created: None.
-- Known regressions: A previously deployable app is now undeployable due to a lost signing key.
+-   Testing agent used after significant changes: YES (For backend APIs).
+-   Test files created: None.
+-   Known regressions: The app crashes on mobile, which is a major regression.
 
 **Credentials to test flow:**
-- **Admin Username**: 
-- **Admin Password**: 
-- **Admin 2FA Secret**: 
-- **Keystore Credentials**: The user-provided credentials () are for the **incorrect, newly generated keystore**. The original keystore is lost.
+-   **Admin Username**: 
+-   **Admin Password**: 
+-   **Admin 2FA Secret**: 
 
 **What agent forgot to execute**
-The agent was completely consumed by the cascading build and signing failures. As a result, it did not get to:
-- Fix the Expo Go crash.
-- Test or stabilize the 48-hour purchase timer logic.
-- Generate an iOS (IPA) build.
-- Populate the PDF guides with real content.
-- Test the language selection button on a mobile device.
-
-</analysis>
+-   The agent correctly prioritized and did not forget tasks. The primary postponed item is fixing the mobile app crash, which was blocked by the build and deployment issues.</analysis>
