@@ -67,9 +67,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "eas": {
-        "projectId": "825a2de4-fffd-475e-afca-d9e0b3aa74aa"
-      },
+      "eas": {},
       "router": {}
     },
     "owner": "ramalhosa"
