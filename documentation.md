@@ -217,5 +217,24 @@ npx eas build --platform android --profile production
 
 ---
 
+## 10. DESCARGAS Y BUILDS
+
+### Links de Descarga (Expo EAS)
+
+| Tipo | Perfil | Link |
+|------|--------|------|
+| AAB (Google Play) | production | https://expo.dev/accounts/alorayz1/projects/gig-zipfinder/builds/e8d5786c-4555-4086-a9af-4f7ea9b2e8de |
+| APK (Instalación directa) | preview-apk | https://expo.dev/accounts/alorayz1/projects/gig-zipfinder/builds/c236abb6-912a-41d9-ac74-589dea12bbc2 |
+
+### Panel de Builds
+- **Todos los builds**: https://expo.dev/accounts/alorayz1/projects/gig-zipfinder/builds
+
+### Versión Actual
+- **Versión**: 1.0.6
+- **Version Code**: 13
+- **Fecha Build**: Febrero 2026
+
+---
+
 **Última Actualización**: Febrero 2026
 **Contacto Técnico**: support@gigzipfinder.app
