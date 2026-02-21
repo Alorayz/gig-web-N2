@@ -902,44 +902,47 @@ async def search_zip_codes_for_purchase(app_name: str):
         chat = LlmChat(
             api_key=emergent_key,
             session_id=f"web-zip-{app_name}-{datetime.utcnow().isoformat()}",
-            system_message=f"""You are an expert researcher on gig economy jobs in the United States.
+            system_message=f"""You are an expert researcher on gig economy jobs in the United States specializing in finding open markets for delivery apps.
 
 Your task is to find the BEST 5 US zip codes where {app_display} is ACTIVELY HIRING new drivers/shoppers RIGHT NOW in {datetime.utcnow().strftime('%B %Y')}.
 
-RESEARCH METHODOLOGY:
-1. Focus on areas with CONFIRMED open positions or high demand
-2. Consider cities experiencing rapid growth (Austin, Phoenix, Nashville, Tampa, etc.)
-3. Look for suburban areas near major metros where demand exceeds supply
-4. Prioritize areas with many restaurants, grocery stores, and Walmart locations
-5. Consider areas where existing drivers report high earnings and consistent orders
+RESEARCH SOURCES TO CONSIDER:
+1. **Reddit communities**: r/InstacartShoppers, r/doordash_drivers, r/Sparkdriver
+2. **YouTube videos**: Recent tutorials about signing up
+3. **Social media**: Twitter/X, Facebook groups, TikTok
+4. **Forums**: Gig worker communities
+5. **News articles**: Recent expansion announcements
 
-IMPORTANT FACTORS:
-- Population growth rate and density
-- Number of restaurants/grocery stores per capita
-- Competition level (fewer drivers = better)
-- Average order volume and peak hours
-- Recent news about {app_display} expansion
+RESEARCH METHODOLOGY:
+1. Look for RECENT MENTIONS (last 30 days) of open zip codes
+2. Prioritize areas where users report successfully signing up
+3. Consider cities with confirmed expansion or hiring waves
+4. Focus on areas with high demand but low driver saturation
+5. Include suburban areas near major metros
 
 You MUST respond with ONLY a valid JSON array - NO other text:
-[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason why"}}]
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason including source", "source": "Reddit/YouTube/etc"}}]
 
 Score meaning:
-- 90-100: Confirmed actively hiring, very high demand
-- 80-89: Very likely open, high demand area
-- 70-79: Good opportunity, moderate competition
-- 60-69: Worth trying, some positions may be available"""
+- 90-100: Confirmed open in last 7 days from multiple sources
+- 80-89: Recently mentioned as open (last 14 days)
+- 70-79: Mentioned in last 30 days, likely open
+- 60-69: High demand area, worth trying"""
         ).with_model("openai", "gpt-4o")
         
         user_message = UserMessage(
-            text=f"""Find the 5 BEST US zip codes to apply for {app_display} in {datetime.utcnow().strftime('%B %Y')}.
+            text=f"""Find the 5 BEST US zip codes where {app_display} is currently accepting new applications in {datetime.utcnow().strftime('%B %Y')}.
 
-Consider:
-1. Areas where {app_display} has recently expanded or is actively recruiting
-2. Growing cities/suburbs with high delivery demand
-3. Areas with less driver saturation
-4. Locations near many {('Walmart stores' if 'spark' in app_name.lower() else 'restaurants and grocery stores')}
+Search for recent mentions in:
+- Reddit posts about open zip codes
+- YouTube videos about signing up for {app_display}
+- Social media posts from gig workers
+- Forum discussions about which areas are open
+- News about {app_display} expansion
 
-Return ONLY the JSON array with zip codes, cities, states, scores (1-100), and brief reasons."""
+Prioritize zip codes that have been RECENTLY MENTIONED by actual users as being open.
+
+Return ONLY the JSON array with zip codes, cities, states, scores, reasons (include where you found this info), and source."""
         )
         
         response = await chat.send_message(user_message)
@@ -952,6 +955,12 @@ Return ONLY the JSON array with zip codes, cities, states, scores (1-100), and b
         if clean_response.startswith("json"):
             clean_response = clean_response[4:]
         clean_response = clean_response.strip()
+        
+        # Try to extract JSON if there's extra text
+        if not clean_response.startswith("["):
+            match = re.search(r'\[[\s\S]*\]', clean_response)
+            if match:
+                clean_response = match.group()
         
         zip_data = json.loads(clean_response)
         
