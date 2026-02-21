@@ -2,7 +2,7 @@
   "expo": {
     "name": "GIG ZipFinder",
     "slug": "gig-zipfinder",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gigzipfinder",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gigzipfinder.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents for verification",
         "NSPhotoLibraryUsageDescription": "Upload profile photos"
@@ -25,9 +25,11 @@
         "backgroundColor": "#0f0f1a"
       },
       "package": "com.gigzipfinder.app",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": [
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ],
       "intentFilters": [
         {
@@ -43,7 +45,8 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -53,6 +56,13 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#0f0f1a"
+        }
+      ],
       [
         "expo-splash-screen",
         {
