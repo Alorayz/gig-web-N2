@@ -35,6 +35,8 @@ Payments: Stripe LIVE
 - [x] Términos y condiciones bilingües
 - [x] Deep linking para la app móvil
 - [x] Múltiples builds AAB generados
+- [x] Sistema de notificaciones push agregado
+- [x] Expiración de compras: 48 horas
 
 ## Prioritized Backlog
 
