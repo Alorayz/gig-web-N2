@@ -74,7 +74,7 @@ export default function ResultsScreen() {
   };
 
   const handleDownloadPdf = async (appName: string) => {
-    const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://gig-code-finder.preview.emergentagent.com';
+    const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://alorayz-gigzipfinder-production.up.railway.app';
     const url = `${baseUrl}/api/download-guide/${appName}/${language}`;
     
     try {
