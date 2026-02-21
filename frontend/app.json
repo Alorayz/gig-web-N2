@@ -77,7 +77,10 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "dd6fd4e9-ca5d-480f-a2cd-3cb095f6d58e"
+      }
     },
     "owner": "alorayz1"
   }
