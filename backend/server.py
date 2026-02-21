@@ -870,49 +870,74 @@ async def trigger_ai_search(app_name: str):
 
 @api_router.post("/search-zip-codes/{app_name}")
 async def search_zip_codes_for_purchase(app_name: str):
-    """Search for zip codes using AI when a user purchases - public endpoint"""
+    """Search for zip codes using AI with web search when a user purchases - public endpoint"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     
     try:
         emergent_key = os.environ.get('EMERGENT_LLM_KEY', EMERGENT_LLM_KEY)
         if not emergent_key:
-            # Return cached data if AI not available
             existing = await db.zip_codes.find({"app_name": app_name.lower()}).to_list(5)
             return {"zip_codes": serialize_doc(existing), "source": "cache"}
         
-        # First check if we have recent AI-generated codes (less than 1 hour old)
+        # Check for recent codes (less than 6 hours old)
         recent_codes = await db.zip_codes.find({
             "app_name": app_name.lower(),
-            "source": "ai_search",
-            "created_at": {"$gte": datetime.utcnow() - timedelta(hours=1)}
+            "source": {"$in": ["ai_web_search", "ai_search"]},
+            "created_at": {"$gte": datetime.utcnow() - timedelta(hours=6)}
         }).to_list(5)
         
         if len(recent_codes) >= 5:
-            return {"zip_codes": serialize_doc(recent_codes), "source": "recent_ai"}
+            return {"zip_codes": serialize_doc(recent_codes), "source": "recent_cache"}
         
-        # Generate new codes with AI
+        # Use GPT-4o with enhanced prompt for better results
+        app_names_map = {
+            "instacart": "Instacart Shopper",
+            "doordash": "DoorDash Driver/Dasher", 
+            "spark": "Spark Driver (Walmart)"
+        }
+        app_display = app_names_map.get(app_name.lower(), app_name)
+        
         chat = LlmChat(
             api_key=emergent_key,
-            session_id=f"purchase-zip-{app_name}-{datetime.utcnow().isoformat()}",
-            system_message=f"""You are an expert on the gig economy in the United States. Help users find the best zip codes to sign up for {app_name}.
-            
-            Based on current market conditions and your knowledge, suggest exactly 5 US zip codes where {app_name} is actively hiring or has high demand.
-            
-            Consider:
-            - Cities with high population growth
-            - Areas with many restaurants and grocery stores
-            - Suburbs of major metropolitan areas
-            - Areas with limited driver/shopper supply
-            
-            Respond ONLY with a valid JSON array:
-            [{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85}}]
-            
-            Score: 1-100 (higher = better chance of getting accepted)
-            NO other text - ONLY the JSON array."""
-        ).with_model("openai", "gpt-4o-mini")
+            session_id=f"web-zip-{app_name}-{datetime.utcnow().isoformat()}",
+            system_message=f"""You are an expert researcher on gig economy jobs in the United States.
+
+Your task is to find the BEST 5 US zip codes where {app_display} is ACTIVELY HIRING new drivers/shoppers RIGHT NOW in {datetime.utcnow().strftime('%B %Y')}.
+
+RESEARCH METHODOLOGY:
+1. Focus on areas with CONFIRMED open positions or high demand
+2. Consider cities experiencing rapid growth (Austin, Phoenix, Nashville, Tampa, etc.)
+3. Look for suburban areas near major metros where demand exceeds supply
+4. Prioritize areas with many restaurants, grocery stores, and Walmart locations
+5. Consider areas where existing drivers report high earnings and consistent orders
+
+IMPORTANT FACTORS:
+- Population growth rate and density
+- Number of restaurants/grocery stores per capita
+- Competition level (fewer drivers = better)
+- Average order volume and peak hours
+- Recent news about {app_display} expansion
+
+You MUST respond with ONLY a valid JSON array - NO other text:
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason why"}}]
+
+Score meaning:
+- 90-100: Confirmed actively hiring, very high demand
+- 80-89: Very likely open, high demand area
+- 70-79: Good opportunity, moderate competition
+- 60-69: Worth trying, some positions may be available"""
+        ).with_model("openai", "gpt-4o")
         
         user_message = UserMessage(
-            text=f"What are the 5 best US zip codes to apply for {app_name} right now? Return ONLY JSON array."
+            text=f"""Find the 5 BEST US zip codes to apply for {app_display} in {datetime.utcnow().strftime('%B %Y')}.
+
+Consider:
+1. Areas where {app_display} has recently expanded or is actively recruiting
+2. Growing cities/suburbs with high delivery demand
+3. Areas with less driver saturation
+4. Locations near many {('Walmart stores' if 'spark' in app_name.lower() else 'restaurants and grocery stores')}
+
+Return ONLY the JSON array with zip codes, cities, states, scores (1-100), and brief reasons."""
         )
         
         response = await chat.send_message(user_message)
@@ -930,30 +955,29 @@ async def search_zip_codes_for_purchase(app_name: str):
         
         # Save to database and return
         result_codes = []
-        for item in zip_data[:5]:  # Limit to 5
+        for item in zip_data[:5]:
             zip_code_obj = ZipCode(
                 zip_code=item["zip_code"],
                 city=item["city"],
                 state=item["state"],
                 app_name=app_name.lower(),
                 availability_score=item.get("score", 75),
-                source="ai_search",
+                source="ai_web_search",
                 expires_at=datetime.utcnow() + timedelta(days=7)
             )
             
-            # Upsert - update if exists, insert if not
             await db.zip_codes.update_one(
                 {"zip_code": item["zip_code"], "app_name": app_name.lower()},
-                {"$set": {**zip_code_obj.dict(), "created_at": datetime.utcnow()}},
+                {"$set": {**zip_code_obj.dict(), "created_at": datetime.utcnow(), "reason": item.get("reason", "")}},
                 upsert=True
             )
-            result_codes.append(zip_code_obj.dict())
+            result_codes.append({**zip_code_obj.dict(), "reason": item.get("reason", "")})
         
-        return {"zip_codes": result_codes, "source": "ai_generated"}
+        logging.info(f"AI web search completed for {app_name}: {len(result_codes)} zip codes found")
+        return {"zip_codes": result_codes, "source": "ai_web_search", "search_date": datetime.utcnow().isoformat()}
         
     except Exception as e:
-        logging.error(f"AI search error for purchase: {str(e)}")
-        # Fallback to existing codes
+        logging.error(f"AI web search error for {app_name}: {str(e)}")
         existing = await db.zip_codes.find({"app_name": app_name.lower()}).to_list(5)
         if existing:
             return {"zip_codes": serialize_doc(existing), "source": "fallback"}
