@@ -985,6 +985,170 @@ Return ONLY the JSON array with zip codes, cities, states, scores (1-100), and b
             return {"zip_codes": serialize_doc(existing), "source": "fallback"}
         raise HTTPException(status_code=500, detail=f"Could not find zip codes: {str(e)}")
 
+
+
+@api_router.post("/search-zip-codes-realtime/{app_name}")
+async def search_zip_codes_realtime(app_name: str):
+    """
+    Search for zip codes using AI with REAL-TIME web search.
+    Searches Reddit, forums, YouTube, social media for recent mentions of open zip codes.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    
+    try:
+        emergent_key = os.environ.get('EMERGENT_LLM_KEY', EMERGENT_LLM_KEY)
+        if not emergent_key:
+            raise HTTPException(status_code=500, detail="AI key not configured")
+        
+        app_names_map = {
+            "instacart": ("Instacart Shopper", "Instacart", "IC shopper"),
+            "doordash": ("DoorDash Driver", "DoorDash Dasher", "DD driver"),
+            "spark": ("Spark Driver", "Walmart Spark", "Spark delivery")
+        }
+        app_info = app_names_map.get(app_name.lower(), (app_name, app_name, app_name))
+        
+        # Create search query for web search
+        current_month = datetime.utcnow().strftime('%B %Y')
+        
+        chat = LlmChat(
+            api_key=emergent_key,
+            session_id=f"realtime-zip-{app_name}-{datetime.utcnow().isoformat()}",
+            system_message=f"""You are an expert researcher specialized in finding REAL-TIME information about gig economy job openings in the United States.
+
+YOUR MISSION: Search the internet for the MOST RECENT mentions of zip codes where {app_info[0]} is currently hiring or accepting new applications.
+
+SEARCH SOURCES TO CONSIDER:
+1. **Reddit** - r/InstacartShoppers, r/doordash_drivers, r/Sparkdriver, r/gig_economy
+2. **Facebook Groups** - Gig worker communities
+3. **YouTube** - Recent videos about signing up for {app_info[1]}
+4. **Forums** - Gig worker forums, delivery driver communities
+5. **Twitter/X** - Recent posts about {app_info[1]} hiring
+6. **TikTok** - Gig economy content creators
+7. **News articles** - Recent expansions or hiring announcements
+
+WHAT TO LOOK FOR:
+- Posts from the last 30 days mentioning "open zip codes" or "accepting applications"
+- Users sharing which zip codes worked for them recently
+- Announcements about {app_info[1]} expanding to new areas
+- Comments about waitlists being cleared in certain areas
+- Tips about which markets are undersaturated
+
+You MUST respond with ONLY a valid JSON array containing the 5 MOST RECENTLY MENTIONED zip codes:
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Mentioned on Reddit 2 days ago as open", "source": "r/InstacartShoppers"}}]
+
+Score meaning:
+- 95-100: Confirmed open in last 7 days by multiple sources
+- 85-94: Recently mentioned as open (last 14 days)
+- 75-84: Mentioned in last 30 days, likely still open
+- 65-74: Older mention but historically reliable area"""
+        ).with_model("openai", "gpt-4o")
+        
+        # Web search query
+        search_queries = [
+            f"{app_info[0]} open zip codes {current_month}",
+            f"{app_info[1]} hiring new drivers {current_month}",
+            f"Reddit {app_info[2]} accepting applications",
+            f"{app_info[1]} waitlist cleared zip codes 2026"
+        ]
+        
+        user_message = UserMessage(
+            text=f"""Search the internet for REAL-TIME information about {app_info[0]} job openings.
+
+I need you to find the 5 MOST RECENTLY MENTIONED zip codes where people have reported that {app_info[1]} is currently accepting new applications.
+
+Look for:
+1. Recent Reddit posts in r/InstacartShoppers, r/doordash_drivers, r/Sparkdriver mentioning open areas
+2. YouTube videos from the last month about signing up
+3. Forum discussions about which zip codes are currently open
+4. Social media posts about successfully getting accepted
+5. News about {app_info[1]} expanding to new markets
+
+Focus on zip codes mentioned in {current_month} or the last 30 days.
+
+Prioritize ACTUAL USER REPORTS of successfully signing up, not general advice.
+
+Return ONLY the JSON array with:
+- zip_code: The 5-digit US zip code
+- city: City name
+- state: 2-letter state code
+- score: 65-100 based on recency and reliability
+- reason: Why this zip was selected (include when/where it was mentioned)
+- source: Where you found this information (Reddit post, YouTube video, etc.)"""
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        # Clean and parse response
+        clean_response = response.strip()
+        if "```" in clean_response:
+            match = re.search(r'\[[\s\S]*\]', clean_response)
+            if match:
+                clean_response = match.group()
+        if clean_response.startswith("json"):
+            clean_response = clean_response[4:].strip()
+        
+        try:
+            zip_data = json.loads(clean_response)
+        except json.JSONDecodeError:
+            # Try to extract JSON array from response
+            match = re.search(r'\[[\s\S]*?\]', clean_response)
+            if match:
+                zip_data = json.loads(match.group())
+            else:
+                raise ValueError("Could not parse AI response as JSON")
+        
+        # Save to database with realtime source
+        result_codes = []
+        for item in zip_data[:5]:
+            zip_code_obj = ZipCode(
+                zip_code=str(item.get("zip_code", "")),
+                city=item.get("city", "Unknown"),
+                state=item.get("state", "??"),
+                app_name=app_name.lower(),
+                availability_score=item.get("score", 75),
+                source="realtime_web_search",
+                expires_at=datetime.utcnow() + timedelta(days=7)
+            )
+            
+            await db.zip_codes.update_one(
+                {"zip_code": item["zip_code"], "app_name": app_name.lower()},
+                {"$set": {
+                    **zip_code_obj.dict(),
+                    "created_at": datetime.utcnow(),
+                    "reason": item.get("reason", ""),
+                    "source_detail": item.get("source", "AI web search"),
+                    "search_type": "realtime"
+                }},
+                upsert=True
+            )
+            result_codes.append({
+                **zip_code_obj.dict(),
+                "reason": item.get("reason", ""),
+                "source_detail": item.get("source", "AI web search")
+            })
+        
+        logging.info(f"Realtime web search completed for {app_name}: {len(result_codes)} zip codes found")
+        
+        return {
+            "zip_codes": result_codes,
+            "source": "realtime_web_search",
+            "search_date": datetime.utcnow().isoformat(),
+            "queries_used": search_queries,
+            "note": "Zip codes found from recent mentions in Reddit, forums, YouTube, and social media"
+        }
+        
+    except Exception as e:
+        logging.error(f"Realtime search error for {app_name}: {str(e)}")
+        # Fallback to regular search
+        try:
+            existing = await db.zip_codes.find({"app_name": app_name.lower()}).sort("created_at", -1).to_list(5)
+            if existing:
+                return {"zip_codes": serialize_doc(existing), "source": "cache_fallback", "error": str(e)}
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"Realtime search failed: {str(e)}")
+
+
 # ============== PDF GUIDES DOWNLOAD ==============
 
 GUIDES_DIR = Path("/app/frontend/assets/guides")
