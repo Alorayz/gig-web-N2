@@ -1160,7 +1160,8 @@ Return ONLY the JSON array with:
 
 # ============== PDF GUIDES DOWNLOAD ==============
 
-GUIDES_DIR = Path("/app/frontend/assets/guides")
+# Use relative path for Railway deployment
+GUIDES_DIR = Path(__file__).parent / "guides"
 
 @api_router.get("/download-guide/{app_name}/{language}")
 async def download_guide(app_name: str, language: str):
