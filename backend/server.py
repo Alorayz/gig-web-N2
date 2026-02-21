@@ -881,17 +881,17 @@ async def search_zip_codes_for_purchase(app_name: str):
             existing = await db.zip_codes.find({"app_name": app_name.lower()}).to_list(5)
             return {"zip_codes": serialize_doc(existing), "source": "cache"}
         
-        # Check for recent codes (less than 6 hours old)
+        # Check for recent codes (less than 2 hours old for realtime, 6 for regular)
         recent_codes = await db.zip_codes.find({
             "app_name": app_name.lower(),
-            "source": {"$in": ["ai_web_search", "ai_search"]},
-            "created_at": {"$gte": datetime.utcnow() - timedelta(hours=6)}
+            "source": {"$in": ["realtime_web_search", "ai_web_search", "ai_search"]},
+            "created_at": {"$gte": datetime.utcnow() - timedelta(hours=2)}
         }).to_list(5)
         
         if len(recent_codes) >= 5:
             return {"zip_codes": serialize_doc(recent_codes), "source": "recent_cache"}
         
-        # Use GPT-4o with enhanced prompt for better results
+        # Use GPT-4o with enhanced prompt including forum/social media search
         app_names_map = {
             "instacart": "Instacart Shopper",
             "doordash": "DoorDash Driver/Dasher", 
