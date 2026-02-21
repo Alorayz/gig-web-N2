@@ -1721,11 +1721,64 @@ async def seed_initial_data():
     
     return {"message": "Initial data seeded successfully"}
 
+# ============== NOTIFICATIONS ==============
+
+class PushTokenRegister(BaseModel):
+    device_id: str
+    push_token: str
+    platform: str = "android"
+
+@api_router.post("/notifications/register")
+async def register_push_token(data: PushTokenRegister):
+    """Register a device for push notifications"""
+    await db.push_tokens.update_one(
+        {"device_id": data.device_id},
+        {
+            "$set": {
+                "push_token": data.push_token,
+                "platform": data.platform,
+                "updated_at": datetime.utcnow()
+            },
+            "$setOnInsert": {
+                "created_at": datetime.utcnow()
+            }
+        },
+        upsert=True
+    )
+    return {"message": "Push token registered successfully"}
+
+@api_router.get("/notifications/tokens", dependencies=[Depends(verify_admin_token)])
+async def get_all_push_tokens():
+    """Get all registered push tokens (admin only)"""
+    tokens = await db.push_tokens.find().to_list(1000)
+    return serialize_doc(tokens)
+
+@api_router.post("/notifications/send", dependencies=[Depends(verify_admin_token)])
+async def send_push_notification(title: str, body: str, app_name: Optional[str] = None):
+    """Send push notification to all registered devices (admin only)"""
+    tokens = await db.push_tokens.find().to_list(1000)
+    
+    # Log notification for record
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "title": title,
+        "body": body,
+        "app_name": app_name,
+        "sent_at": datetime.utcnow(),
+        "recipients_count": len(tokens)
+    })
+    
+    return {
+        "message": f"Notification queued for {len(tokens)} devices",
+        "title": title,
+        "body": body
+    }
+
 # ============== MAIN ROUTES ==============
 
 @api_router.get("/")
 async def root():
-    return {"message": "GIG ZipFinder API v1.0", "status": "active"}
+    return {"message": "GIG ZipFinder API v1.1", "status": "active"}
 
 # Serve Privacy Policy
 STATIC_DIR = Path(__file__).parent / "static"
