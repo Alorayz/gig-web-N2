@@ -71,7 +71,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#0f0f1a"
         }
-      ]
+      ],
+      "@stripe/stripe-react-native"
     ],
     "experiments": {
       "typedRoutes": true
