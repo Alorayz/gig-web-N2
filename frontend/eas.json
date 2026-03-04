@@ -30,6 +30,9 @@
         "buildType": "app-bundle",
         "credentialsSource": "local"
       },
+      "ios": {
+        "credentialsSource": "local"
+      },
       "distribution": "store",
       "env": {
         "NODE_ENV": "production"
@@ -37,6 +40,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "Alorayz@icloud.com",
+        "ascAppId": "",
+        "appleTeamId": ""
+      }
+    }
   }
 }
