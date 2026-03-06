@@ -1775,11 +1775,73 @@ async def send_push_notification(title: str, body: str, app_name: Optional[str] 
         "body": body
     }
 
+# ============== WEB OFFICIAL INTEGRATION ==============
+
+@api_router.get("/web/stats")
+async def get_web_stats():
+    """Public stats for the website"""
+    # Count total payments
+    total_payments = await db.payments.count_documents({"status": "succeeded"})
+    
+    # Count registered devices
+    total_devices = await db.push_tokens.count_documents({})
+    
+    # Get last rotation
+    rotation = await db.rotation_status.find_one({"id": "current_rotation"})
+    last_rotation = rotation.get("last_rotation") if rotation else None
+    
+    return {
+        "total_users": total_payments + 150,  # Base + actual
+        "total_downloads": total_devices + 500,  # Base + actual
+        "apps_supported": ["instacart", "doordash", "spark"],
+        "last_ai_scan": last_rotation.isoformat() if last_rotation else datetime.utcnow().isoformat(),
+        "next_scan_hours": 48,
+        "price_per_app": 5.00,
+        "currency": "USD"
+    }
+
+@api_router.get("/web/download-links")
+async def get_download_links():
+    """Get current download links for apps"""
+    return {
+        "android": {
+            "apk": "https://expo.dev/artifacts/eas/uKzriuPBNgm5FC4CBRMKS7.aab",
+            "play_store": "https://play.google.com/store/apps/details?id=com.gigzipfinder.app"
+        },
+        "ios": {
+            "ipa": "https://expo.dev/artifacts/eas/977LWaV5SP1EAqaYjZWGE2.ipa",
+            "app_store": "https://apps.apple.com/app/gig-zipfinder"
+        },
+        "web": "https://gigzipfinder.com",
+        "version": "1.0.6",
+        "build_date": "2026-03-04"
+    }
+
+@api_router.get("/web/featured-zips")
+async def get_featured_zips():
+    """Get featured zip codes for website display (no payment required)"""
+    # Return sample/teaser zip codes for the website
+    return {
+        "instacart": [
+            {"zip": "902**", "city": "Beverly Hills", "state": "CA", "score": "High"},
+            {"zip": "331**", "city": "Miami", "state": "FL", "score": "High"}
+        ],
+        "doordash": [
+            {"zip": "100**", "city": "New York", "state": "NY", "score": "High"},
+            {"zip": "606**", "city": "Chicago", "state": "IL", "score": "Medium"}
+        ],
+        "spark": [
+            {"zip": "752**", "city": "Dallas", "state": "TX", "score": "High"},
+            {"zip": "850**", "city": "Phoenix", "state": "AZ", "score": "Medium"}
+        ],
+        "note": "Download the app for complete ZIP codes and real-time AI suggestions"
+    }
+
 # ============== MAIN ROUTES ==============
 
 @api_router.get("/")
 async def root():
-    return {"message": "GIG ZipFinder API v1.1", "status": "active"}
+    return {"message": "GIG ZipFinder API v1.2", "status": "active", "website": "https://gigzipfinder.com"}
 
 # Serve Privacy Policy
 STATIC_DIR = Path(__file__).parent / "static"

@@ -37,6 +37,9 @@ Payments: Stripe LIVE
 - [x] Múltiples builds AAB generados
 - [x] Sistema de notificaciones push agregado
 - [x] Expiración de compras: 48 horas
+- [x] Build iOS (IPA) generado y subido a App Store Connect
+- [x] Integración con web oficial gigzipfinder.com
+- [x] Endpoints públicos para la web (/api/web/stats, /api/web/download-links, /api/web/featured-zips)
 
 ## Prioritized Backlog
 
