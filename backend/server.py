@@ -233,7 +233,7 @@ async def get_stripe_config():
 
 @api_router.post("/stripe/create-payment-intent")
 async def create_payment_intent(payment: PaymentCreate):
-    """Create a Stripe payment intent for $5"""
+    """Create a Stripe payment intent for $20"""
     if not payment.terms_accepted:
         raise HTTPException(status_code=400, detail="Terms and conditions must be accepted")
     
@@ -784,7 +784,7 @@ async def get_admin_stats():
     """Get payment statistics"""
     total_payments = await db.payments.count_documents({})
     successful_payments = await db.payments.count_documents({"status": "succeeded"})
-    total_revenue = successful_payments * 5  # $5 per payment
+    total_revenue = successful_payments * 20  # $20 per payment
     
     # Payments by app
     pipeline = [

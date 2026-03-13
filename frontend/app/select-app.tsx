@@ -84,7 +84,7 @@ export default function SelectAppScreen() {
                 <Text style={styles.appDesc}>{t(app.descKey)}</Text>
               </View>
               <View style={styles.priceContainer}>
-                <Text style={styles.price}>$5.00</Text>
+                <Text style={styles.price}>$20.00</Text>
                 <Ionicons name="chevron-forward" size={24} color={COLORS.accent} />
               </View>
             </TouchableOpacity>

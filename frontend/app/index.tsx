@@ -263,7 +263,7 @@ export default function HomeScreen() {
             <>
               <Ionicons name="rocket" size={24} color="#fff" />
               <Text style={styles.mainButtonText}>
-                {language === 'en' ? 'Buy New App - $5.00' : 'Comprar Nueva App - $5.00'}
+                {language === 'en' ? 'Buy New App - $20.00' : 'Comprar Nueva App - $20.00'}
               </Text>
             </>
           )}
@@ -273,8 +273,8 @@ export default function HomeScreen() {
         <View style={styles.priceInfoContainer}>
           <Text style={styles.priceInfo}>
             {language === 'en' 
-              ? '$5.00 per app • 48h Access' 
-              : '$5.00 por app • Acceso 48h'}
+              ? '$20.00 per app • 48h Access' 
+              : '$20.00 por app • Acceso 48h'}
           </Text>
           <Text style={styles.priceSubInfo}>
             {language === 'en' 

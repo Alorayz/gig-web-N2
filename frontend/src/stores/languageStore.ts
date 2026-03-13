@@ -41,7 +41,7 @@ const translations: Record<string, Record<string, string>> = {
     'app.title': 'GIG ZipFinder',
     'app.subtitle': 'Find Your Next Opportunity',
     'app.description': 'Get access to zip codes with availability for Instacart, DoorDash, and Spark Driver plus step-by-step guides!',
-    'app.getStarted': 'Get Started - $5.00',
+    'app.getStarted': 'Get Started - $20.00',
     'app.selectLanguage': 'Select Language',
     'app.adminAccess': 'Admin Access',
     
@@ -54,7 +54,7 @@ const translations: Record<string, Record<string, string>> = {
     'select.sparkDesc': 'Walmart delivery service',
     'select.doordashDesc': 'Food & grocery delivery',
     'select.instacartDesc': 'Grocery shopping & delivery',
-    'select.perApp': '$5.00 per app',
+    'select.perApp': '$20.00 per app',
     
     // Terms Screen
     'terms.title': 'Terms & Conditions',
@@ -64,11 +64,11 @@ const translations: Record<string, Record<string, string>> = {
     
     // Payment Screen
     'payment.title': 'Complete Payment',
-    'payment.amount': '$5.00 USD',
+    'payment.amount': '$20.00 USD',
     'payment.description': 'Payment for app opening guides and zip code suggestions',
     'payment.processing': 'Processing Payment...',
     'payment.verifying': 'Verifying Payment...',
-    'payment.pay': 'Pay $5.00',
+    'payment.pay': 'Pay $20.00',
     'payment.secure': 'Secure payment powered by Stripe',
     'payment.includes': 'Your purchase includes:',
     'payment.item1': '5 zip codes with high availability potential',
@@ -123,7 +123,7 @@ const translations: Record<string, Record<string, string>> = {
     'app.title': 'GIG ZipFinder',
     'app.subtitle': 'Encuentra Tu Próxima Oportunidad',
     'app.description': '¡Obtén acceso a códigos postales con disponibilidad para Instacart, DoorDash y Spark Driver más guías paso a paso!',
-    'app.getStarted': 'Comenzar - $5.00',
+    'app.getStarted': 'Comenzar - $20.00',
     'app.selectLanguage': 'Seleccionar Idioma',
     'app.adminAccess': 'Acceso Admin',
     
@@ -136,7 +136,7 @@ const translations: Record<string, Record<string, string>> = {
     'select.sparkDesc': 'Servicio de entrega de Walmart',
     'select.doordashDesc': 'Entrega de comida y abarrotes',
     'select.instacartDesc': 'Compras y entrega de abarrotes',
-    'select.perApp': '$5.00 por app',
+    'select.perApp': '$20.00 por app',
     
     // Terms Screen
     'terms.title': 'Términos y Condiciones',
@@ -146,11 +146,11 @@ const translations: Record<string, Record<string, string>> = {
     
     // Payment Screen
     'payment.title': 'Completar Pago',
-    'payment.amount': '$5.00 USD',
+    'payment.amount': '$20.00 USD',
     'payment.description': 'Pago por guías de apertura de apps y sugerencias de códigos postales',
     'payment.processing': 'Procesando Pago...',
     'payment.verifying': 'Verificando Pago...',
-    'payment.pay': 'Pagar $5.00',
+    'payment.pay': 'Pagar $20.00',
     'payment.secure': 'Pago seguro con Stripe',
     'payment.includes': 'Tu compra incluye:',
     'payment.item1': '5 códigos postales con alto potencial de disponibilidad',

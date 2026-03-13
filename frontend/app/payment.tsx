@@ -292,7 +292,7 @@ export default function PaymentScreen() {
         {/* Price Display */}
         <View style={styles.priceContainer}>
           <Text style={styles.priceLabel}>{t('payment.amount')}</Text>
-          <Text style={styles.price}>$5.00</Text>
+          <Text style={styles.price}>$20.00</Text>
           <Text style={styles.priceDescription}>{t('payment.description')}</Text>
         </View>
 
@@ -371,7 +371,7 @@ export default function PaymentScreen() {
             <>
               <Ionicons name="card" size={24} color="#fff" />
               <Text style={styles.payButtonText}>
-                {language === 'en' ? 'Pay $5.00 Securely' : 'Pagar $5.00 de Forma Segura'}
+                {language === 'en' ? 'Pay $20.00 Securely' : 'Pagar $20.00 de Forma Segura'}
               </Text>
             </>
           )}
