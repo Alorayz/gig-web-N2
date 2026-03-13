@@ -31,7 +31,7 @@
         "credentialsSource": "local"
       },
       "ios": {
-        "credentialsSource": "local"
+        "credentialsSource": "remote"
       },
       "distribution": "store",
       "env": {
@@ -40,12 +40,6 @@
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "appleId": "Alorayz@icloud.com",
-        "ascAppId": "",
-        "appleTeamId": ""
-      }
-    }
+    "production": {}
   }
 }
