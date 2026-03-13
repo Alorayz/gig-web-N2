@@ -158,4 +158,23 @@ export const checkRotationStatus = async () => {
   return response.data;
 };
 
+// Apple In-App Purchase API
+export const validateIAPReceipt = async (receipt: string, productId: string, deviceId: string) => {
+  const response = await api.post('/iap/validate-receipt', {
+    receipt,
+    product_id: productId,
+    platform: 'ios',
+    device_id: deviceId,
+  });
+  return response.data;
+};
+
+export const getIAPProducts = async () => {
+  const response = await api.get('/iap/products');
+  return response.data;
+};
+
+// Price constant
+export const PRODUCT_PRICE_USD = 20.00;
+
 export default api;

@@ -55,6 +55,15 @@ def serialize_doc(doc):
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_placeholder')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_placeholder')
 
+# Price configuration - $20 USD
+PRODUCT_PRICE_USD = 20.00
+PRODUCT_PRICE_CENTS = 2000  # Stripe uses cents
+
+# Apple IAP configuration
+APPLE_SHARED_SECRET = os.environ.get('APPLE_SHARED_SECRET', '')
+APPLE_SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt"
+APPLE_PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt"
+
 # Admin secret for JWT-like tokens
 ADMIN_SECRET = os.environ.get('ADMIN_SECRET_KEY', 'admin_secret_key_2025')
 
@@ -131,7 +140,7 @@ class Payment(BaseModel):
     stripe_payment_intent_id: Optional[str] = None
     user_id: str
     app_name: str
-    amount: int = 500  # $5.00 in cents
+    amount: int = 2000  # $20.00 in cents
     currency: str = "usd"
     status: str = "pending"  # pending, succeeded, failed
     terms_accepted: bool = False
@@ -231,7 +240,7 @@ async def create_payment_intent(payment: PaymentCreate):
     try:
         # Create Stripe payment intent
         intent = stripe.PaymentIntent.create(
-            amount=500,  # $5.00 in cents
+            amount=2000,  # $20.00 in cents
             currency="usd",
             automatic_payment_methods={"enabled": True},
             metadata={
@@ -311,7 +320,7 @@ async def create_checkout_session(request: CheckoutSessionRequest):
                         'name': f'GIG ZipFinder - {request.app_name.title()} Package',
                         'description': f'5 Hot Zip Codes + {request.app_name.title()} Guide + Google Voice Guide',
                     },
-                    'unit_amount': 500,  # $5.00 in cents
+                    'unit_amount': 2000,  # $20.00 in cents
                 },
                 'quantity': 1,
             }],
@@ -329,7 +338,7 @@ async def create_checkout_session(request: CheckoutSessionRequest):
         # Save payment record
         payment = Payment(
             user_id=request.user_id,
-            amount=5.00,
+            amount=20.00,
             currency="usd",
             app_name=request.app_name,
             status="pending",
@@ -369,7 +378,7 @@ async def verify_checkout_session(session_id: str):
                     },
                     "$setOnInsert": {
                         "id": str(uuid.uuid4()),
-                        "amount": 5.00,
+                        "amount": 20.00,
                         "currency": "usd",
                         "terms_accepted": True,
                         "created_at": datetime.utcnow()
@@ -390,7 +399,7 @@ async def verify_checkout_session(session_id: str):
                         },
                         "$setOnInsert": {
                             "id": str(uuid.uuid4()),
-                            "amount": 5.00,
+                            "amount": 20.00,
                             "currency": "usd",
                             "terms_accepted": True,
                             "created_at": datetime.utcnow()
@@ -518,7 +527,7 @@ async def get_paid_apps_by_user(user_id: str):
                                     "$setOnInsert": {
                                         "id": str(uuid.uuid4()),
                                         "stripe_payment_intent_id": session.payment_intent or session.id,
-                                        "amount": 500,
+                                        "amount": 2000,
                                         "currency": "usd",
                                         "terms_accepted": True,
                                         "created_at": datetime.utcnow()
@@ -1233,7 +1242,7 @@ THE ZIP CODES PROVIDED ARE SUGGESTIONS ONLY. We make NO guarantee that:
 Zip codes are updated weekly and may close at any time due to high demand. The availability status can change within minutes.
 
 4. PAYMENT AND REFUND POLICY
-- The fee of $5.00 USD is charged for ACCESS TO GUIDES and instructions, NOT for the zip codes themselves
+- The fee of $20.00 USD is charged for ACCESS TO GUIDES and instructions, NOT for the zip codes themselves
 - Zip codes are provided as a FREE bonus service
 - ALL PAYMENTS ARE FINAL - No refunds or cancellations will be processed
 - We cannot verify if zip codes were used or if applications were submitted
@@ -1302,7 +1311,7 @@ LOS CÓDIGOS POSTALES PROPORCIONADOS SON SOLO SUGERENCIAS. NO garantizamos que:
 Los códigos postales se actualizan semanalmente y pueden cerrarse en cualquier momento debido a la alta demanda. El estado de disponibilidad puede cambiar en minutos.
 
 4. POLÍTICA DE PAGO Y REEMBOLSO
-- La tarifa de $5.00 USD se cobra por ACCESO A LAS GUÍAS e instrucciones, NO por los códigos postales
+- La tarifa de $20.00 USD se cobra por ACCESO A LAS GUÍAS e instrucciones, NO por los códigos postales
 - Los códigos postales se proporcionan como un servicio de bonificación GRATUITO
 - TODOS LOS PAGOS SON FINALES - No se procesarán reembolsos ni cancelaciones
 - No podemos verificar si los códigos postales fueron usados o si se enviaron solicitudes
@@ -1775,6 +1784,136 @@ async def send_push_notification(title: str, body: str, app_name: Optional[str] 
         "body": body
     }
 
+# ============== APPLE IN-APP PURCHASE VALIDATION ==============
+
+class IAPReceiptValidation(BaseModel):
+    receipt: str
+    product_id: str
+    platform: str = "ios"
+    device_id: Optional[str] = None
+
+@api_router.post("/iap/validate-receipt")
+async def validate_apple_receipt(data: IAPReceiptValidation):
+    """Validate Apple In-App Purchase receipt"""
+    
+    if data.platform != "ios":
+        raise HTTPException(status_code=400, detail="Only iOS receipts supported")
+    
+    # Validate with Apple's servers
+    payload = {
+        "receipt-data": data.receipt,
+        "password": APPLE_SHARED_SECRET,
+        "exclude-old-transactions": True
+    }
+    
+    async with httpx.AsyncClient() as client:
+        # Try production first
+        response = await client.post(APPLE_PRODUCTION_URL, json=payload)
+        result = response.json()
+        
+        # If status 21007, receipt is from sandbox - try sandbox URL
+        if result.get("status") == 21007:
+            response = await client.post(APPLE_SANDBOX_URL, json=payload)
+            result = response.json()
+    
+    # Check if receipt is valid
+    if result.get("status") != 0:
+        status_messages = {
+            21000: "App Store could not read the receipt",
+            21002: "Receipt data is malformed",
+            21003: "Receipt could not be authenticated",
+            21004: "Shared secret does not match",
+            21005: "Receipt server unavailable",
+            21006: "Receipt is valid but subscription expired",
+            21007: "Receipt is from sandbox (handled)",
+            21008: "Receipt is from production",
+            21010: "Authorization declined"
+        }
+        error_msg = status_messages.get(result.get("status"), f"Unknown error: {result.get('status')}")
+        raise HTTPException(status_code=400, detail=f"Invalid receipt: {error_msg}")
+    
+    # Extract purchase info
+    receipt = result.get("receipt", {})
+    in_app = receipt.get("in_app", [])
+    
+    if not in_app:
+        raise HTTPException(status_code=400, detail="No in-app purchase found")
+    
+    # Get most recent transaction
+    latest_transaction = max(in_app, key=lambda x: int(x.get("purchase_date_ms", 0)))
+    
+    # Verify product ID matches
+    purchased_product = latest_transaction.get("product_id")
+    valid_products = [
+        "com.gigzipfinder.app.instacart_codes",
+        "com.gigzipfinder.app.doordash_codes", 
+        "com.gigzipfinder.app.spark_codes"
+    ]
+    
+    if purchased_product not in valid_products:
+        raise HTTPException(status_code=400, detail=f"Invalid product ID: {purchased_product}")
+    
+    # Determine app_name from product_id
+    app_name = purchased_product.split(".")[-1].replace("_codes", "")
+    
+    # Store the purchase
+    purchase_record = {
+        "id": str(uuid.uuid4()),
+        "device_id": data.device_id,
+        "transaction_id": latest_transaction.get("transaction_id"),
+        "product_id": purchased_product,
+        "app_name": app_name,
+        "platform": "ios",
+        "payment_method": "apple_iap",
+        "amount": PRODUCT_PRICE_USD,
+        "currency": "USD",
+        "status": "succeeded",
+        "receipt_data": data.receipt[:100] + "...",  # Store truncated for reference
+        "created_at": datetime.utcnow(),
+        "expires_at": datetime.utcnow() + timedelta(hours=48)
+    }
+    
+    await db.payments.insert_one(purchase_record)
+    
+    return {
+        "is_valid": True,
+        "product_id": purchased_product,
+        "app_name": app_name,
+        "transaction_id": latest_transaction.get("transaction_id"),
+        "expires_at": purchase_record["expires_at"].isoformat(),
+        "message": "Purchase validated successfully"
+    }
+
+@api_router.get("/iap/products")
+async def get_iap_products():
+    """Get available IAP products"""
+    return {
+        "products": [
+            {
+                "product_id": "com.gigzipfinder.app.instacart_codes",
+                "name": "Instacart ZIP Codes",
+                "description": "5 AI-recommended ZIP codes for Instacart",
+                "price": PRODUCT_PRICE_USD,
+                "currency": "USD"
+            },
+            {
+                "product_id": "com.gigzipfinder.app.doordash_codes",
+                "name": "DoorDash ZIP Codes", 
+                "description": "5 AI-recommended ZIP codes for DoorDash",
+                "price": PRODUCT_PRICE_USD,
+                "currency": "USD"
+            },
+            {
+                "product_id": "com.gigzipfinder.app.spark_codes",
+                "name": "Spark Driver ZIP Codes",
+                "description": "5 AI-recommended ZIP codes for Spark Driver",
+                "price": PRODUCT_PRICE_USD,
+                "currency": "USD"
+            }
+        ],
+        "price_display": f"${PRODUCT_PRICE_USD:.2f} USD per app"
+    }
+
 # ============== WEB OFFICIAL INTEGRATION ==============
 
 @api_router.get("/web/stats")
@@ -1796,7 +1935,7 @@ async def get_web_stats():
         "apps_supported": ["instacart", "doordash", "spark"],
         "last_ai_scan": last_rotation.isoformat() if last_rotation else datetime.utcnow().isoformat(),
         "next_scan_hours": 48,
-        "price_per_app": 5.00,
+        "price_per_app": 20.00,
         "currency": "USD"
     }
 
@@ -1813,8 +1952,8 @@ async def get_download_links():
             "app_store": "https://apps.apple.com/app/gig-zipfinder"
         },
         "web": "https://gigzipfinder.com",
-        "version": "1.0.6",
-        "build_date": "2026-03-04"
+        "version": "1.1.0",
+        "build_date": "2026-03-11"
     }
 
 @api_router.get("/web/featured-zips")

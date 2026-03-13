@@ -28,7 +28,8 @@ Payments: Stripe LIVE
 - [x] Backend completo con FastAPI
 - [x] Despliegue en Railway (producción permanente)
 - [x] MongoDB Atlas conectado
-- [x] Stripe LIVE integrado
+- [x] Stripe LIVE integrado (para Android/Web)
+- [x] **Apple In-App Purchase integrado (para iOS)** - NUEVO
 - [x] Búsqueda AI en tiempo real (Reddit, YouTube, Twitter, Foros)
 - [x] Panel de administración con 2FA
 - [x] Rotación automática de códigos postales
@@ -40,6 +41,8 @@ Payments: Stripe LIVE
 - [x] Build iOS (IPA) generado y subido a App Store Connect
 - [x] Integración con web oficial gigzipfinder.com
 - [x] Endpoints públicos para la web (/api/web/stats, /api/web/download-links, /api/web/featured-zips)
+- [x] **Precio actualizado a $20 USD** - NUEVO
+- [x] **Versión 1.1.0 con versionCode 14** - NUEVO
 
 ## Prioritized Backlog
 
