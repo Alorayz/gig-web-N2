@@ -2000,6 +2000,60 @@ async def get_privacy_policy():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
+class WebCheckoutRequest(BaseModel):
+    user_id: str
+    app_name: str
+    terms_accepted: bool
+    return_url: str
+
+@api_router.post("/web/create-checkout-session")
+async def create_web_checkout_session(request: WebCheckoutRequest):
+    """Create a Stripe Checkout Session for web payments with web-compatible URLs"""
+    try:
+        base_url = request.return_url.rstrip('/')
+
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'GIG ZipFinder - {request.app_name.title()} Package',
+                        'description': f'5 Hot Zip Codes + {request.app_name.title()} Guide + Google Voice Guide',
+                    },
+                    'unit_amount': 2000,
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=f'{base_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}&app_name={request.app_name}',
+            cancel_url=f'{base_url}/purchase/{request.app_name}',
+            metadata={
+                'user_id': request.user_id,
+                'app_name': request.app_name,
+                'terms_accepted': str(request.terms_accepted),
+                'platform': 'web'
+            }
+        )
+
+        payment = Payment(
+            user_id=request.user_id,
+            amount=2000,
+            currency="usd",
+            app_name=request.app_name,
+            status="pending",
+            stripe_payment_intent_id=session.payment_intent if session.payment_intent else session.id,
+            terms_accepted=request.terms_accepted
+        )
+        await db.payments.insert_one(payment.dict())
+
+        return {
+            "checkout_url": session.url,
+            "session_id": session.id
+        }
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

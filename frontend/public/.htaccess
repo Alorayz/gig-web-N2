@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Redirect API calls to backend
+  RewriteRule ^api/(.*)$ https://zip-search-pro.preview.emergentagent.com/api/$1 [P,L]
+  
+  # Serve React app for all other routes
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ /index.html [L]
+</IfModule>

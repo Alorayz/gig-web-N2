@@ -11,7 +11,7 @@ import pyotp
 from datetime import datetime
 
 # API Base URL from environment
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://postal-gig.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://zip-search-pro.preview.emergentagent.com')
 
 # Test credentials
 ADMIN_USERNAME = "admin"

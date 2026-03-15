@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+        "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+        "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #0a1628;
+}
+
+code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+        monospace;
+}
+
+
+@layer base {
+  :root {
+        --background: 210 40% 8%;
+        --foreground: 0 0% 98%;
+        --card: 217 33% 17%;
+        --card-foreground: 0 0% 98%;
+        --popover: 217 33% 17%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 189 100% 50%;
+        --primary-foreground: 210 40% 8%;
+        --secondary: 215 25% 27%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 215 25% 27%;
+        --muted-foreground: 0 0% 70%;
+        --accent: 142 76% 56%;
+        --accent-foreground: 0 0% 9%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 215 25% 27%;
+        --input: 215 25% 27%;
+        --ring: 189 100% 50%;
+        --chart-1: 189 100% 50%;
+        --chart-2: 142 76% 56%;
+        --chart-3: 215 25% 27%;
+        --chart-4: 217 33% 17%;
+        --chart-5: 210 40% 8%;
+        --radius: 0.75rem;
+    }
+  .dark {
+        --background: 210 40% 8%;
+        --foreground: 0 0% 98%;
+        --card: 217 33% 17%;
+        --card-foreground: 0 0% 98%;
+        --popover: 217 33% 17%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 189 100% 50%;
+        --primary-foreground: 210 40% 8%;
+        --secondary: 215 25% 27%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 215 25% 27%;
+        --muted-foreground: 0 0% 70%;
+        --accent: 142 76% 56%;
+        --accent-foreground: 0 0% 9%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 215 25% 27%;
+        --input: 215 25% 27%;
+        --ring: 189 100% 50%;
+        --chart-1: 189 100% 50%;
+        --chart-2: 142 76% 56%;
+        --chart-3: 215 25% 27%;
+        --chart-4: 217 33% 17%;
+        --chart-5: 210 40% 8%;
+    }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+}
+
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+  }
+  
+  .glow-effect {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.3);
+  }
+  
+  .card-glow {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(6, 182, 212, 0.1);
+  }
+}
+
+/* Hide Emergent branding - Multiple selectors for maximum coverage */
+div[class*="emergent"],
+div[class*="Emergent"],
+a[href*="emergent"],
+a[href*="Emergent"],
+[class*="made-with"],
+[class*="made_with"],
+[class*="Made"],
+[class*="powered-by"],
+[class*="powered_by"],
+button[class*="emergent"],
+span[class*="emergent"],
+/* Target by content */
+a[href*="emergentagent.com"],
+a[href*="emergent.sh"],
+/* Target by position */
+div[style*="position: fixed"][style*="bottom"],
+div[style*="position: fixed"][style*="z-index"],
+/* Target common badge positions */
+div[style*="bottom: 20px"],
+div[style*="bottom: 10px"],
+div[style*="right: 20px"],
+/* Specific Emergent badge classes */
+[data-emergent],
+[data-badge],
+#emergent-badge,
+.emergent-badge,
+.emergent-branding,
+/* Target iframes that might contain branding */
+iframe[src*="emergent"],
+/* Target by text content using attribute selectors */
+*[class*="badge"],
+*[id*="badge"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
+/* Additional aggressive hiding for any remaining badges */
+body > div:last-child:not(#root),
+body > div[style*="z-index: 999"],
+body > div[style*="z-index: 9999"],
+body > a[style*="position: fixed"] {
+  display: none !important;
+}
