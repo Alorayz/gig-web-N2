@@ -15,12 +15,15 @@ import { Purchase } from "./components/Purchase";
 import { PaymentSuccess } from "./components/PaymentSuccess";
 import { Dashboard } from "./components/Dashboard";
 
+import { DownloadApps } from "./components/DownloadApps";
+
 const HomePage = () => (
   <>
     <Hero />
     <Features />
     <HowItWorks />
     <Pricing />
+    <DownloadApps />
     <FAQ />
     <HighDemandNotice />
   </>

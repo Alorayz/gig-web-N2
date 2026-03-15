@@ -3,7 +3,7 @@
   RewriteBase /
   
   # Redirect API calls to backend
-  RewriteRule ^api/(.*)$ https://zip-search-pro.preview.emergentagent.com/api/$1 [P,L]
+  RewriteRule ^api/(.*)$ https://demand-zone-ai.preview.emergentagent.com/api/$1 [P,L]
   
   # Serve React app for all other routes
   RewriteCond %{REQUEST_FILENAME} !-f
