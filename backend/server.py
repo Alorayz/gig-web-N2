@@ -28,6 +28,50 @@ load_dotenv(ROOT_DIR / '.env')
 
 # Emergent LLM Key for AI search
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-5925220033f944a85B')
+PERPLEXITY_API_KEY = os.environ.get('PERPLEXITY_API_KEY', '')
+
+# Perplexity-powered real-time web search
+async def perplexity_web_search(app_name: str, app_display: str) -> str:
+    """Use Perplexity Sonar to search the web in real-time for gig economy ZIP codes"""
+    if not PERPLEXITY_API_KEY:
+        return None
+    try:
+        from perplexity import Perplexity
+        client = Perplexity(api_key=PERPLEXITY_API_KEY)
+        current_month = datetime.utcnow().strftime('%B %Y')
+        
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="sonar",
+            messages=[{
+                "role": "user",
+                "content": f"""Search the web for the BEST US ZIP codes where {app_display} is actively hiring new drivers/shoppers RIGHT NOW in {current_month}.
+
+Search Reddit (r/InstacartShoppers, r/doordash_drivers, r/Sparkdriver), YouTube tutorials, forums, Facebook groups, and news articles.
+
+I need SPECIFIC ZIP codes where people have recently signed up successfully or where hiring is confirmed open.
+
+For each ZIP code found, include:
+- The ZIP code number
+- City and state
+- Where you found this information (Reddit post, YouTube video, news article, etc.)
+- How recently it was mentioned
+
+Focus on the 5 most promising areas with the strongest evidence of current availability."""
+            }],
+            web_search_options={"search_context_size": "high"}
+        )
+        
+        web_data = response.choices[0].message.content
+        citations = getattr(response, 'citations', [])
+        if citations:
+            web_data += f"\n\nSources: {', '.join(str(c) for c in citations[:10])}"
+        
+        logging.info(f"Perplexity web search completed for {app_name}: {len(web_data)} chars")
+        return web_data
+    except Exception as e:
+        logging.error(f"Perplexity search failed for {app_name}: {str(e)}")
+        return None
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -883,7 +927,7 @@ async def trigger_ai_search(app_name: str):
 
 @api_router.post("/search-zip-codes/{app_name}")
 async def search_zip_codes_for_purchase(app_name: str):
-    """Search for zip codes using AI with web search when a user purchases - public endpoint"""
+    """Hybrid search: Perplexity (real web search) + GPT-4o (structure data)"""
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     
     try:
@@ -892,111 +936,99 @@ async def search_zip_codes_for_purchase(app_name: str):
             existing = await db.zip_codes.find({"app_name": app_name.lower()}).to_list(5)
             return {"zip_codes": serialize_doc(existing), "source": "cache"}
         
-        # Check for recent codes (less than 2 hours old for realtime, 6 for regular)
+        # Check for recent codes (less than 2 hours old)
         recent_codes = await db.zip_codes.find({
             "app_name": app_name.lower(),
-            "source": {"$in": ["realtime_web_search", "ai_web_search", "ai_search"]},
+            "source": {"$in": ["perplexity_hybrid", "realtime_web_search", "ai_web_search", "ai_search", "scheduled_perplexity"]},
             "created_at": {"$gte": datetime.utcnow() - timedelta(hours=2)}
         }).to_list(5)
         
         if len(recent_codes) >= 5:
             return {"zip_codes": serialize_doc(recent_codes), "source": "recent_cache"}
         
-        # Use GPT-4o with enhanced prompt including forum/social media search
         app_names_map = {
             "instacart": "Instacart Shopper",
             "doordash": "DoorDash Driver/Dasher", 
             "spark": "Spark Driver (Walmart)"
         }
         app_display = app_names_map.get(app_name.lower(), app_name)
+        current_month = datetime.utcnow().strftime('%B %Y')
+        
+        # Step 1: Perplexity real web search
+        web_data = await perplexity_web_search(app_name, app_display)
+        
+        # Step 2: GPT-4o structures the data (with or without Perplexity results)
+        if web_data:
+            system_msg = f"""You are a data extraction expert. You will receive REAL web search results about {app_display} job availability.
+Extract the 5 BEST US zip codes from the search data. If specific ZIP codes are mentioned, use those. If only cities are mentioned, provide the main ZIP code for that city.
+
+You MUST respond with ONLY a valid JSON array:
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Evidence from web search", "source": "URL or platform where found"}}]
+
+Score: 90-100=confirmed by multiple recent sources, 80-89=mentioned recently, 70-79=likely based on context, 60-69=inferred from area demand"""
+            user_msg = f"""Here are REAL web search results about {app_display} availability in {current_month}:
+
+---
+{web_data}
+---
+
+Extract the 5 best ZIP codes from this data. Return ONLY the JSON array."""
+            search_source = "perplexity_hybrid"
+        else:
+            system_msg = f"""You are an expert researcher on gig economy jobs in the United States.
+Find the BEST 5 US zip codes where {app_display} is ACTIVELY HIRING in {current_month}.
+Consider Reddit, YouTube, forums, and news.
+
+Respond with ONLY a valid JSON array:
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason", "source": "Reddit/YouTube/etc"}}]"""
+            user_msg = f"Find 5 best US zip codes for {app_display} availability in {current_month}. Return ONLY JSON."
+            search_source = "ai_web_search"
         
         chat = LlmChat(
             api_key=emergent_key,
-            session_id=f"web-zip-{app_name}-{datetime.utcnow().isoformat()}",
-            system_message=f"""You are an expert researcher on gig economy jobs in the United States specializing in finding open markets for delivery apps.
-
-Your task is to find the BEST 5 US zip codes where {app_display} is ACTIVELY HIRING new drivers/shoppers RIGHT NOW in {datetime.utcnow().strftime('%B %Y')}.
-
-RESEARCH SOURCES TO CONSIDER:
-1. **Reddit communities**: r/InstacartShoppers, r/doordash_drivers, r/Sparkdriver
-2. **YouTube videos**: Recent tutorials about signing up
-3. **Social media**: Twitter/X, Facebook groups, TikTok
-4. **Forums**: Gig worker communities
-5. **News articles**: Recent expansion announcements
-
-RESEARCH METHODOLOGY:
-1. Look for RECENT MENTIONS (last 30 days) of open zip codes
-2. Prioritize areas where users report successfully signing up
-3. Consider cities with confirmed expansion or hiring waves
-4. Focus on areas with high demand but low driver saturation
-5. Include suburban areas near major metros
-
-You MUST respond with ONLY a valid JSON array - NO other text:
-[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason including source", "source": "Reddit/YouTube/etc"}}]
-
-Score meaning:
-- 90-100: Confirmed open in last 7 days from multiple sources
-- 80-89: Recently mentioned as open (last 14 days)
-- 70-79: Mentioned in last 30 days, likely open
-- 60-69: High demand area, worth trying"""
+            session_id=f"hybrid-{app_name}-{datetime.utcnow().isoformat()}",
+            system_message=system_msg
         ).with_model("openai", "gpt-4o")
         
-        user_message = UserMessage(
-            text=f"""Find the 5 BEST US zip codes where {app_display} is currently accepting new applications in {datetime.utcnow().strftime('%B %Y')}.
-
-Search for recent mentions in:
-- Reddit posts about open zip codes
-- YouTube videos about signing up for {app_display}
-- Social media posts from gig workers
-- Forum discussions about which areas are open
-- News about {app_display} expansion
-
-Prioritize zip codes that have been RECENTLY MENTIONED by actual users as being open.
-
-Return ONLY the JSON array with zip codes, cities, states, scores, reasons (include where you found this info), and source."""
-        )
+        response = await chat.send_message(UserMessage(text=user_msg))
         
-        response = await chat.send_message(user_message)
-        
-        # Clean and parse response
+        # Parse response
         clean_response = response.strip()
-        if clean_response.startswith("```"):
-            lines = clean_response.split("\n")
-            clean_response = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-        if clean_response.startswith("json"):
-            clean_response = clean_response[4:]
-        clean_response = clean_response.strip()
-        
-        # Try to extract JSON if there's extra text
-        if not clean_response.startswith("["):
+        if "```" in clean_response:
             match = re.search(r'\[[\s\S]*\]', clean_response)
+            if match:
+                clean_response = match.group()
+        if clean_response.startswith("json"):
+            clean_response = clean_response[4:].strip()
+        if not clean_response.startswith("["):
+            match = re.search(r'\[[\s\S]*?\]', clean_response)
             if match:
                 clean_response = match.group()
         
         zip_data = json.loads(clean_response)
         
-        # Save to database and return
+        # Save to database
         result_codes = []
         for item in zip_data[:5]:
             zip_code_obj = ZipCode(
-                zip_code=item["zip_code"],
+                zip_code=str(item["zip_code"]),
                 city=item["city"],
                 state=item["state"],
                 app_name=app_name.lower(),
                 availability_score=item.get("score", 75),
-                source="ai_web_search",
+                source=search_source,
                 expires_at=datetime.utcnow() + timedelta(hours=48)
             )
             
             await db.zip_codes.update_one(
-                {"zip_code": item["zip_code"], "app_name": app_name.lower()},
-                {"$set": {**zip_code_obj.dict(), "created_at": datetime.utcnow(), "reason": item.get("reason", "")}},
+                {"zip_code": str(item["zip_code"]), "app_name": app_name.lower()},
+                {"$set": {**zip_code_obj.dict(), "created_at": datetime.utcnow(), "reason": item.get("reason", ""), "source_detail": item.get("source", "")}},
                 upsert=True
             )
             result_codes.append({**zip_code_obj.dict(), "reason": item.get("reason", "")})
         
-        logging.info(f"AI web search completed for {app_name}: {len(result_codes)} zip codes found")
-        return {"zip_codes": result_codes, "source": "ai_web_search", "search_date": datetime.utcnow().isoformat()}
+        logging.info(f"Hybrid search completed for {app_name}: {len(result_codes)} zip codes ({search_source})")
+        return {"zip_codes": result_codes, "source": search_source, "search_date": datetime.utcnow().isoformat()}
         
     except Exception as e:
         logging.error(f"AI web search error for {app_name}: {str(e)}")
@@ -2079,8 +2111,8 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 
 async def scheduled_ai_search():
-    """Background task: Run AI search for ALL apps every 48 hours"""
-    logger.info("=== SCHEDULED AI SEARCH STARTED (every 48 hours) ===")
+    """Background task: Run hybrid Perplexity + GPT-4o search for ALL apps every 48 hours"""
+    logger.info("=== SCHEDULED HYBRID AI SEARCH STARTED (every 48 hours) ===")
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     
     apps = ["instacart", "doordash", "spark"]
@@ -2100,37 +2132,31 @@ async def scheduled_ai_search():
             app_display = app_names_map.get(app_name, app_name)
             current_month = datetime.utcnow().strftime('%B %Y')
             
+            # Step 1: Perplexity real web search
+            web_data = await perplexity_web_search(app_name, app_display)
+            
+            # Step 2: GPT-4o structures the data
+            if web_data:
+                system_msg = f"""You are a data extraction expert. Extract the 5 BEST US zip codes from real web search results about {app_display}.
+If specific ZIP codes are mentioned, use those. If only cities are mentioned, provide the main ZIP code.
+Respond with ONLY a valid JSON array:
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Evidence from web data", "source": "URL or platform"}}]"""
+                user_msg = f"Extract 5 best ZIP codes from this web data about {app_display} in {current_month}:\n\n{web_data}\n\nReturn ONLY JSON array."
+                search_source = "scheduled_perplexity"
+            else:
+                system_msg = f"""You are an expert on gig economy jobs. Find 5 best US zip codes where {app_display} is hiring in {current_month}.
+Respond with ONLY a valid JSON array:
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason", "source": "Source"}}]"""
+                user_msg = f"Find 5 best US zip codes for {app_display} in {current_month}. Return ONLY JSON."
+                search_source = "scheduled_ai_search"
+            
             chat = LlmChat(
                 api_key=emergent_key,
                 session_id=f"scheduled-{app_name}-{datetime.utcnow().isoformat()}",
-                system_message=f"""You are an expert researcher on gig economy jobs in the United States.
-
-Your task is to find the BEST 5 US zip codes where {app_display} is ACTIVELY HIRING new drivers/shoppers RIGHT NOW in {current_month}.
-
-RESEARCH SOURCES TO CONSIDER:
-1. Reddit: r/InstacartShoppers, r/doordash_drivers, r/Sparkdriver
-2. YouTube: Recent signup tutorials
-3. Social media: Twitter/X, Facebook groups, TikTok
-4. Forums: Gig worker communities
-5. News: Recent expansion announcements
-
-METHODOLOGY:
-- Look for RECENT mentions (last 30 days) of open zip codes
-- Prioritize areas where users report successfully signing up
-- Consider cities with confirmed expansion or hiring waves
-- Focus on areas with high demand but low driver saturation
-
-RESPOND WITH ONLY a valid JSON array:
-[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason including source", "source": "Reddit/YouTube/etc"}}]
-
-Score: 90-100=confirmed last 7 days, 80-89=last 14 days, 70-79=last 30 days, 60-69=high demand area"""
+                system_message=system_msg
             ).with_model("openai", "gpt-4o")
             
-            user_message = UserMessage(
-                text=f"Find the 5 BEST US zip codes where {app_display} is currently accepting new applications in {current_month}. Return ONLY the JSON array."
-            )
-            
-            response = await chat.send_message(user_message)
+            response = await chat.send_message(UserMessage(text=user_msg))
             
             clean_response = response.strip()
             if "```" in clean_response:
@@ -2156,35 +2182,32 @@ Score: 90-100=confirmed last 7 days, 80-89=last 14 days, 70-79=last 30 days, 60-
                     state=item.get("state", "??"),
                     app_name=app_name,
                     availability_score=item.get("score", 75),
-                    source="scheduled_ai_search",
+                    source=search_source,
                     expires_at=datetime.utcnow() + timedelta(hours=48)
                 )
                 await db.zip_codes.insert_one({
                     **zip_code_obj.dict(),
                     "created_at": datetime.utcnow(),
                     "reason": item.get("reason", ""),
-                    "source_detail": item.get("source", "AI scheduled search")
+                    "source_detail": item.get("source", "")
                 })
             
-            logger.info(f"Scheduled search completed for {app_name}: {len(zip_data[:5])} new zip codes")
-            
-            # Small delay between apps to avoid rate limits
+            logger.info(f"Scheduled search completed for {app_name}: {len(zip_data[:5])} new zip codes ({search_source})")
             await asyncio.sleep(3)
             
         except Exception as e:
             logger.error(f"Scheduled search failed for {app_name}: {str(e)}")
     
-    # Record the rotation
     await db.system_config.update_one(
         {"key": "last_zip_rotation"},
         {"$set": {
             "value": datetime.utcnow(),
-            "type": "scheduled_ai_search",
+            "type": "scheduled_hybrid_search",
             "next_run": (datetime.utcnow() + timedelta(hours=48)).isoformat()
         }},
         upsert=True
     )
-    logger.info("=== SCHEDULED AI SEARCH COMPLETED ===")
+    logger.info("=== SCHEDULED HYBRID AI SEARCH COMPLETED ===")
 
 @app.on_event("startup")
 async def start_scheduler():

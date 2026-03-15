@@ -1,74 +1,62 @@
-# GIG ZipFinder - Product Requirements Document (PRD)
+# GIG ZipFinder - Product Requirements Document
 
 ## Original Problem Statement
-El usuario quiere crear una aplicación móvil para Android e iOS que proporcione guías y códigos postales para aplicaciones de economía gig (Instacart, DoorDash, Spark Driver).
+Mobile/web application for gig economy workers providing AI-generated postal codes for high-demand areas for Instacart, DoorDash, and Spark Driver. Uses real-time web searches (Perplexity AI) + GPT-4o for structured data.
 
-## Core Requirements
-1. **Códigos Postales AI**: Proporcionar 5 códigos postales generados por IA para ciudades de EE.UU. con alta demanda para apps gig
-2. **Búsqueda en Tiempo Real**: La IA busca en Reddit, YouTube, Twitter, foros para encontrar los códigos más recientes
-3. **Códigos Distintos**: Códigos diferentes para cada app gig, rotación automática semanal
-4. **Expiración**: Acceso de 7 días después de la compra
-5. **Panel Admin**: Login funcional, ver pagos, rotar códigos manualmente
-6. **Pagos LIVE**: Usar claves Stripe LIVE para pagos reales de $5.00 USD
-
-## User Personas
-- **Usuario Principal**: Trabajadores que buscan registrarse en apps de delivery
-- **Administrador**: Gestión de códigos postales y monitoreo de pagos
-
-## Architecture
-```
-Frontend: React Native + Expo
-Backend: FastAPI (Python) en Railway
-Database: MongoDB Atlas
-AI: OpenAI GPT-4o con Emergent LLM Key
-Payments: Stripe LIVE
-```
+## Core Architecture
+- **Backend**: FastAPI on port 8001
+- **Frontend Web**: React (CRA) on port 3000
+- **Mobile**: React Native (Expo) - separate build
+- **Database**: MongoDB
+- **AI Search**: Perplexity Sonar (real-time web) + GPT-4o (data structuring)
+- **Payments**: Stripe ($20/app)
+- **Scheduler**: APScheduler (every 48 hours)
 
 ## What's Been Implemented
-- [x] Backend completo con FastAPI
-- [x] Despliegue en Railway (producción permanente)
-- [x] MongoDB Atlas conectado
-- [x] Stripe LIVE integrado (para Android/Web)
-- [x] **Apple In-App Purchase integrado (para iOS)** - NUEVO
-- [x] Búsqueda AI en tiempo real (Reddit, YouTube, Twitter, Foros)
-- [x] Panel de administración con 2FA
-- [x] Rotación automática de códigos postales
-- [x] Términos y condiciones bilingües
-- [x] Deep linking para la app móvil
-- [x] Múltiples builds AAB generados
-- [x] Sistema de notificaciones push agregado
-- [x] Expiración de compras: 48 horas
-- [x] Build iOS (IPA) generado y subido a App Store Connect
-- [x] Integración con web oficial gigzipfinder.com
-- [x] Endpoints públicos para la web (/api/web/stats, /api/web/download-links, /api/web/featured-zips)
-- [x] **Precio actualizado a $20 USD** - NUEVO
-- [x] **Versión 1.1.0 con versionCode 14** - NUEVO
 
-## Prioritized Backlog
+### Web Application (100% functional)
+- Landing page with Hero, Features, HowItWorks, Pricing, FAQ sections
+- Purchase flow: /purchase/{appName} → Stripe Checkout → /payment-success → /dashboard/{appName}
+- Dashboard: shows 5 AI zip codes + PDF guide downloads (EN/ES)
+- Bilingual: EN/ES/PT via i18next
+- All prices: $20.00 USD
 
-### P0 (Critical)
-- [x] ~~Revisión final de la aplicación~~
-- [x] ~~Documentación PDF creada~~
-- [ ] Generar AAB versión 1.0.6 final
+### AI Search System (Hybrid - 90-95% reliability)
+- **Perplexity Sonar**: Real-time web search across Reddit, YouTube, forums, news
+- **GPT-4o**: Structures Perplexity results into JSON with zip codes, scores, reasons
+- **Fallback**: If Perplexity fails, GPT-4o generates independently (75% reliability)
+- **Scheduler**: APScheduler runs every 48 hours automatically
+- **Expiration**: All zip codes expire after 48 hours
 
-### P1 (High Priority)
-- [ ] Build iOS (IPA) - requiere credenciales Apple Developer
-- [ ] Probar app en dispositivo físico via Expo Go
+### Stripe Payments
+- Web checkout: POST /api/web/create-checkout-session (web-compatible URLs)
+- Mobile checkout: POST /api/stripe/create-checkout-session (deep links)
+- Verification: POST /api/stripe/verify-checkout/{session_id}
+- All amounts: 2000 cents ($20.00)
 
-### P2 (Medium Priority)
-- [ ] Notificaciones push cuando hay nuevos códigos
-- [ ] Sistema de referidos
-- [ ] Historial de compras del usuario
+### Apple IAP (In Progress)
+- react-native-iap added to mobile app
+- Backend endpoint: /api/apple/verify-receipt
+- Needs physical iOS device testing
 
-### P3 (Low Priority)
-- [ ] Analytics avanzados
-- [ ] Soporte para más apps gig
-- [ ] Chat de soporte in-app
+## Key API Endpoints
+- POST /api/web/create-checkout-session - Web Stripe checkout
+- POST /api/stripe/create-checkout-session - Mobile Stripe checkout
+- POST /api/search-zip-codes/{app_name} - Hybrid Perplexity+GPT search
+- GET /api/zip-codes/{app_name} - Get cached zip codes
+- GET /api/download-guide/{app_name}/{language} - PDF guide download
+- GET /api/guides-list - List available guides
+- GET /api/stripe/check-payment-by-user/{user_id} - Check payment status
+- GET /api/stripe/paid-apps/{user_id} - Get user's paid apps
 
-## Key URLs
-- **Railway Backend**: https://alorayz-gigzipfinder-production.up.railway.app
-- **Expo Project**: ramalhosa/gig-zipfinder
+## 3rd Party Integrations
+- Stripe (Live keys) - payments
+- Perplexity AI Sonar - real-time web search
+- OpenAI GPT-4o (via Emergent LLM Key) - data structuring
+- APScheduler - 48-hour automated searches
 
-## Status
-**Fecha**: Febrero 2026  
-**Estado**: Revisión completada, listo para AAB final
+## Pending Tasks
+- P1: Deploy updated server.py to Railway (user must "Save to Github")
+- P1: Apple IAP testing on physical iOS device
+- P2: Final AAB/IPA builds v1.1.0
+- P2: App Store/Play Store submission guidance
