@@ -20,6 +20,8 @@ import httpx
 import json
 import re
 import asyncio
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -126,7 +128,7 @@ class ZipCode(BaseModel):
     availability_score: int = Field(default=80, ge=0, le=100)  # Higher = more likely available
     last_updated: datetime = Field(default_factory=datetime.utcnow)
     source: str = "manual"  # manual, ai_search
-    expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(days=7))
+    expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(hours=48))
 
 class ZipCodeCreate(BaseModel):
     zip_code: str
@@ -573,7 +575,7 @@ async def create_zip_code(zip_data: ZipCodeCreate):
         state=zip_data.state,
         app_name=zip_data.app_name.lower(),
         availability_score=zip_data.availability_score,
-        expires_at=datetime.utcnow() + timedelta(days=7)
+        expires_at=datetime.utcnow() + timedelta(hours=48)
     )
     await db.zip_codes.insert_one(zip_code.dict())
     return zip_code
@@ -856,7 +858,7 @@ async def trigger_ai_search(app_name: str):
                 app_name=app_name.lower(),
                 availability_score=item.get("score", 75),
                 source="ai_search",
-                expires_at=datetime.utcnow() + timedelta(days=7)
+                expires_at=datetime.utcnow() + timedelta(hours=48)
             )
             
             # Check if zip code already exists for this app
@@ -983,7 +985,7 @@ Return ONLY the JSON array with zip codes, cities, states, scores, reasons (incl
                 app_name=app_name.lower(),
                 availability_score=item.get("score", 75),
                 source="ai_web_search",
-                expires_at=datetime.utcnow() + timedelta(days=7)
+                expires_at=datetime.utcnow() + timedelta(hours=48)
             )
             
             await db.zip_codes.update_one(
@@ -1125,7 +1127,7 @@ Return ONLY the JSON array with:
                 app_name=app_name.lower(),
                 availability_score=item.get("score", 75),
                 source="realtime_web_search",
-                expires_at=datetime.utcnow() + timedelta(days=7)
+                expires_at=datetime.utcnow() + timedelta(hours=48)
             )
             
             await db.zip_codes.update_one(
@@ -1485,7 +1487,7 @@ async def rotate_zip_codes():
             zip_code = ZipCode(
                 **zc, 
                 app_name=app_name, 
-                expires_at=datetime.utcnow() + timedelta(days=7)
+                expires_at=datetime.utcnow() + timedelta(hours=48)
             )
             await db.zip_codes.insert_one(zip_code.dict())
     
@@ -1530,7 +1532,7 @@ async def check_zip_rotation():
         "current_week_set": current_week,
         "last_rotation": last_rotation.isoformat() if last_rotation else None,
         "last_week_set": last_week_set,
-        "next_rotation": "Monday at 00:00 UTC (automatic weekly)"
+        "next_rotation": "Automatic every 48 hours via AI scheduler"
     }
 
 # ============== SEED DATA ==============
@@ -1547,7 +1549,7 @@ async def seed_initial_data():
         last_rotation = config.get("value")
         if last_rotation:
             # Rotate if more than 7 days have passed
-            if datetime.utcnow() - last_rotation > timedelta(days=7):
+            if datetime.utcnow() - last_rotation > timedelta(hours=48):
                 should_rotate = True
     else:
         # First time seeding
@@ -2072,6 +2074,147 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============== AUTOMATIC 48-HOUR AI SEARCH SCHEDULER ==============
+
+scheduler = AsyncIOScheduler()
+
+async def scheduled_ai_search():
+    """Background task: Run AI search for ALL apps every 48 hours"""
+    logger.info("=== SCHEDULED AI SEARCH STARTED (every 48 hours) ===")
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    
+    apps = ["instacart", "doordash", "spark"]
+    app_names_map = {
+        "instacart": "Instacart Shopper",
+        "doordash": "DoorDash Driver/Dasher",
+        "spark": "Spark Driver (Walmart)"
+    }
+    
+    emergent_key = os.environ.get('EMERGENT_LLM_KEY', EMERGENT_LLM_KEY)
+    if not emergent_key:
+        logger.error("SCHEDULED SEARCH FAILED: No AI key configured")
+        return
+    
+    for app_name in apps:
+        try:
+            app_display = app_names_map.get(app_name, app_name)
+            current_month = datetime.utcnow().strftime('%B %Y')
+            
+            chat = LlmChat(
+                api_key=emergent_key,
+                session_id=f"scheduled-{app_name}-{datetime.utcnow().isoformat()}",
+                system_message=f"""You are an expert researcher on gig economy jobs in the United States.
+
+Your task is to find the BEST 5 US zip codes where {app_display} is ACTIVELY HIRING new drivers/shoppers RIGHT NOW in {current_month}.
+
+RESEARCH SOURCES TO CONSIDER:
+1. Reddit: r/InstacartShoppers, r/doordash_drivers, r/Sparkdriver
+2. YouTube: Recent signup tutorials
+3. Social media: Twitter/X, Facebook groups, TikTok
+4. Forums: Gig worker communities
+5. News: Recent expansion announcements
+
+METHODOLOGY:
+- Look for RECENT mentions (last 30 days) of open zip codes
+- Prioritize areas where users report successfully signing up
+- Consider cities with confirmed expansion or hiring waves
+- Focus on areas with high demand but low driver saturation
+
+RESPOND WITH ONLY a valid JSON array:
+[{{"zip_code": "12345", "city": "City Name", "state": "ST", "score": 85, "reason": "Brief reason including source", "source": "Reddit/YouTube/etc"}}]
+
+Score: 90-100=confirmed last 7 days, 80-89=last 14 days, 70-79=last 30 days, 60-69=high demand area"""
+            ).with_model("openai", "gpt-4o")
+            
+            user_message = UserMessage(
+                text=f"Find the 5 BEST US zip codes where {app_display} is currently accepting new applications in {current_month}. Return ONLY the JSON array."
+            )
+            
+            response = await chat.send_message(user_message)
+            
+            clean_response = response.strip()
+            if "```" in clean_response:
+                match = re.search(r'\[[\s\S]*\]', clean_response)
+                if match:
+                    clean_response = match.group()
+            if clean_response.startswith("json"):
+                clean_response = clean_response[4:].strip()
+            if not clean_response.startswith("["):
+                match = re.search(r'\[[\s\S]*?\]', clean_response)
+                if match:
+                    clean_response = match.group()
+            
+            zip_data = json.loads(clean_response)
+            
+            # Delete old codes for this app and insert new ones
+            await db.zip_codes.delete_many({"app_name": app_name})
+            
+            for item in zip_data[:5]:
+                zip_code_obj = ZipCode(
+                    zip_code=str(item.get("zip_code", "")),
+                    city=item.get("city", "Unknown"),
+                    state=item.get("state", "??"),
+                    app_name=app_name,
+                    availability_score=item.get("score", 75),
+                    source="scheduled_ai_search",
+                    expires_at=datetime.utcnow() + timedelta(hours=48)
+                )
+                await db.zip_codes.insert_one({
+                    **zip_code_obj.dict(),
+                    "created_at": datetime.utcnow(),
+                    "reason": item.get("reason", ""),
+                    "source_detail": item.get("source", "AI scheduled search")
+                })
+            
+            logger.info(f"Scheduled search completed for {app_name}: {len(zip_data[:5])} new zip codes")
+            
+            # Small delay between apps to avoid rate limits
+            await asyncio.sleep(3)
+            
+        except Exception as e:
+            logger.error(f"Scheduled search failed for {app_name}: {str(e)}")
+    
+    # Record the rotation
+    await db.system_config.update_one(
+        {"key": "last_zip_rotation"},
+        {"$set": {
+            "value": datetime.utcnow(),
+            "type": "scheduled_ai_search",
+            "next_run": (datetime.utcnow() + timedelta(hours=48)).isoformat()
+        }},
+        upsert=True
+    )
+    logger.info("=== SCHEDULED AI SEARCH COMPLETED ===")
+
+@app.on_event("startup")
+async def start_scheduler():
+    """Start the 48-hour automatic AI search scheduler"""
+    # Run every 48 hours
+    scheduler.add_job(
+        scheduled_ai_search,
+        IntervalTrigger(hours=48),
+        id="ai_search_48h",
+        name="AI ZIP Code Search (every 48 hours)",
+        replace_existing=True
+    )
+    scheduler.start()
+    logger.info("48-hour AI search scheduler started")
+    
+    # Check if we need an immediate search (if last one was >48h ago)
+    config = await db.system_config.find_one({"key": "last_zip_rotation"})
+    should_run_now = False
+    if config:
+        last_rotation = config.get("value")
+        if last_rotation and (datetime.utcnow() - last_rotation > timedelta(hours=48)):
+            should_run_now = True
+    else:
+        should_run_now = True
+    
+    if should_run_now:
+        logger.info("Last AI search was >48h ago or never ran. Running now...")
+        asyncio.create_task(scheduled_ai_search())
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    scheduler.shutdown(wait=False)
     client.close()
