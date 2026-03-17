@@ -16,6 +16,7 @@ import { PaymentSuccess } from "./components/PaymentSuccess";
 import { Dashboard } from "./components/Dashboard";
 
 import { DownloadApps } from "./components/DownloadApps";
+import { ArchitectureDiagram } from "./components/ArchitectureDiagram";
 
 const HomePage = () => (
   <>
@@ -23,6 +24,7 @@ const HomePage = () => (
     <Features />
     <HowItWorks />
     <Pricing />
+    <ArchitectureDiagram />
     <DownloadApps />
     <FAQ />
     <HighDemandNotice />
