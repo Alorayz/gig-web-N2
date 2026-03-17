@@ -15,11 +15,21 @@ Mobile/web application for gig economy workers providing AI-generated postal cod
 ## What's Been Implemented
 
 ### Web Application (100% functional)
-- Landing page with Hero, Features, HowItWorks, Pricing, FAQ sections
-- Purchase flow: /purchase/{appName} → Stripe Checkout → /payment-success → /dashboard/{appName}
+- Landing page with Hero, Features, HowItWorks, Pricing, DownloadApps, FAQ sections
+- Purchase flow: /purchase/{appName} -> Stripe Checkout -> /payment-success -> /dashboard/{appName}
 - Dashboard: shows 5 AI zip codes + PDF guide downloads (EN/ES)
-- Bilingual: EN/ES/PT via i18next
+- Trilingual: EN/ES/PT via i18next
 - All prices: $20.00 USD
+
+### UI/UX Overhaul (COMPLETED - March 15, 2026)
+- Fixed broken translation keys (nav.download, nav.buyNow, nav.home) in ES and PT
+- Added mobile sidebar menu with all nav items + "Comprar Ahora" purchase button
+- Replaced emoji icons (shopping cart, pizza, car) with uniform Lucide icons (ShoppingBag, Truck, Package) with gradient backgrounds in "Apps Compatibles" section
+- Made pricing buy buttons use uniform ShoppingBag icons (all same icon, centered)
+- Added real Apple App Store and Google Play SVG logos in download section (replacing generic Lucide icons)
+- Added expandable "Como Instalar el APK" guide with 5 installation steps and troubleshooting tips in all 3 languages
+- Fixed inconsistent translation keys (pricing.secureDescription vs pricing.secureDesc in PT)
+- Added missing pricing translation keys for PT (launchOffer, ctaSubtitle, paymentMethods)
 
 ### AI Search System (Hybrid - 90-95% reliability)
 - **Perplexity Sonar**: Real-time web search across Reddit, YouTube, forums, news
@@ -56,7 +66,7 @@ Mobile/web application for gig economy workers providing AI-generated postal cod
 - APScheduler - 48-hour automated searches
 
 ## Pending Tasks
-- P1: Deploy updated server.py to Railway (user must "Save to Github")
-- P1: Apple IAP testing on physical iOS device
-- P2: Final AAB/IPA builds v1.1.0
-- P2: App Store/Play Store submission guidance
+- P1: Verify iOS (IPA) build status and deliver to user
+- P2: Provide deployment guidance for updating production repository (Railway)
+- P2: Apple IAP testing on physical iOS device
+- P3: App Store/Play Store submission guidance
