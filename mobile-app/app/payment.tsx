@@ -9,12 +9,26 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
-import { createCheckoutSession, verifyCheckoutSession, getZipCodesByApp, getGuidesByApp, searchZipCodesWithAI } from '../src/services/api';
+import { createCheckoutSession, verifyCheckoutSession, getZipCodesByApp, getGuidesByApp, searchZipCodesWithAI, validateIAPReceipt } from '../src/services/api';
+import appleIAPService, { PRODUCT_IDS } from '../src/services/appleIAP';
+
+const isIOS = Platform.OS === 'ios';
+
+// Map app name to IAP product ID
+const getProductId = (appName: string): string => {
+  switch (appName) {
+    case 'instacart': return PRODUCT_IDS.INSTACART_ZIP_CODES;
+    case 'doordash': return PRODUCT_IDS.DOORDASH_ZIP_CODES;
+    case 'spark': return PRODUCT_IDS.SPARK_ZIP_CODES;
+    default: return PRODUCT_IDS.INSTACART_ZIP_CODES;
+  }
+};
 
 export default function PaymentScreen() {
   const router = useRouter();
@@ -34,7 +48,6 @@ export default function PaymentScreen() {
     resetForNewPurchase,
   } = useAppStore();
   
-  // Use deviceId as user identifier
   const userIdToUse = deviceId;
   
   const [isChecking, setIsChecking] = useState(true);
@@ -42,6 +55,7 @@ export default function PaymentScreen() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'loading' | 'ready' | 'processing' | 'success' | 'failed'>('idle');
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [iapReady, setIapReady] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -62,29 +76,89 @@ export default function PaymentScreen() {
     setIsLoading(true);
     
     try {
-      // Create Checkout Session directly
-      const checkoutData = await createCheckoutSession(userIdToUse, selectedApp, termsAccepted);
-      setCurrentSessionId(checkoutData.session_id);
-      setCheckoutUrl(checkoutData.checkout_url);
-      setLastSessionId(checkoutData.session_id); // Save for later verification
-      setPaymentStatus('ready');
+      if (isIOS) {
+        // Initialize Apple IAP
+        const connected = await appleIAPService.initialize();
+        if (connected) {
+          setIapReady(true);
+          setPaymentStatus('ready');
+        } else {
+          throw new Error('Could not connect to App Store');
+        }
+      } else {
+        // Android: Use Stripe Checkout
+        const checkoutData = await createCheckoutSession(userIdToUse, selectedApp, termsAccepted);
+        setCurrentSessionId(checkoutData.session_id);
+        setCheckoutUrl(checkoutData.checkout_url);
+        setLastSessionId(checkoutData.session_id);
+        setPaymentStatus('ready');
+      }
     } catch (error: any) {
       console.error('Payment initialization error:', error);
       setPaymentStatus('failed');
       Alert.alert(
-        language === 'en' ? 'Error' : 'Error',
-        error.response?.data?.detail || (language === 'en' ? 'Could not initialize payment' : 'No se pudo inicializar el pago')
+        'Error',
+        error.message || (language === 'en' ? 'Could not initialize payment' : 'No se pudo inicializar el pago')
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePayment = async () => {
+  // ============= iOS Apple IAP Payment =============
+  const handleAppleIAPPayment = async () => {
+    if (!selectedApp || !iapReady) return;
+
+    setPaymentStatus('processing');
+
+    try {
+      const productId = getProductId(selectedApp);
+      const purchase = await appleIAPService.purchaseProduct(productId);
+      
+      if (!purchase) {
+        // User cancelled
+        setPaymentStatus('ready');
+        return;
+      }
+
+      // Validate receipt with our backend
+      const isValid = await validateIAPReceipt(
+        purchase.transactionReceipt,
+        productId,
+        userIdToUse
+      );
+
+      if (isValid) {
+        // Finish the transaction with Apple
+        await appleIAPService.finishTransaction(purchase);
+        await completePayment();
+      } else {
+        setPaymentStatus('failed');
+        Alert.alert(
+          'Error',
+          language === 'en' 
+            ? 'Purchase could not be verified. Please contact support.' 
+            : 'La compra no pudo ser verificada. Por favor contacte soporte.',
+          [{ text: 'OK', onPress: () => setPaymentStatus('ready') }]
+        );
+      }
+    } catch (error: any) {
+      console.error('Apple IAP error:', error);
+      setPaymentStatus('failed');
+      Alert.alert(
+        language === 'en' ? 'Purchase Failed' : 'Compra Fallida',
+        error.message || (language === 'en' ? 'Could not complete purchase' : 'No se pudo completar la compra'),
+        [{ text: 'OK', onPress: () => setPaymentStatus('ready') }]
+      );
+    }
+  };
+
+  // ============= Android Stripe Payment =============
+  const handleStripePayment = async () => {
     if (!checkoutUrl || !currentSessionId) {
       Alert.alert(
         language === 'en' ? 'Please Wait' : 'Por Favor Espere',
-        language === 'en' ? 'Payment is still loading...' : 'El pago aún está cargando...'
+        language === 'en' ? 'Payment is still loading...' : 'El pago aun esta cargando...'
       );
       return;
     }
@@ -92,22 +166,20 @@ export default function PaymentScreen() {
     setPaymentStatus('processing');
 
     try {
-      // Open Stripe Checkout in browser
       const canOpen = await Linking.canOpenURL(checkoutUrl);
       if (canOpen) {
         await Linking.openURL(checkoutUrl);
         
-        // Show instructions to user
         setTimeout(() => {
           Alert.alert(
             language === 'en' ? 'Complete Payment' : 'Completar Pago',
             language === 'en' 
               ? 'After completing the payment in Stripe, tap "I Already Paid" to unlock your content.' 
-              : 'Después de completar el pago en Stripe, toque "Ya Pagué" para desbloquear su contenido.',
+              : 'Despues de completar el pago en Stripe, toque "Ya Pague" para desbloquear su contenido.',
             [
               { 
-                text: language === 'en' ? 'I Already Paid' : 'Ya Pagué', 
-                onPress: () => verifyPayment() 
+                text: language === 'en' ? 'I Already Paid' : 'Ya Pague', 
+                onPress: () => verifyStripePayment() 
               },
               { 
                 text: language === 'en' ? 'Cancel' : 'Cancelar', 
@@ -118,7 +190,7 @@ export default function PaymentScreen() {
           );
         }, 1000);
       } else {
-        throw new Error(language === 'en' ? 'Could not open payment page' : 'No se pudo abrir la página de pago');
+        throw new Error(language === 'en' ? 'Could not open payment page' : 'No se pudo abrir la pagina de pago');
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
@@ -131,13 +203,12 @@ export default function PaymentScreen() {
     }
   };
 
-  const verifyPayment = async () => {
+  const verifyStripePayment = async () => {
     if (!currentSessionId) return;
 
     setPaymentStatus('processing');
 
     try {
-      // Verify the Checkout Session
       const result = await verifyCheckoutSession(currentSessionId);
       
       if (result.status === 'succeeded') {
@@ -147,24 +218,11 @@ export default function PaymentScreen() {
           language === 'en' ? 'Payment Not Found' : 'Pago No Encontrado',
           language === 'en' 
             ? 'We could not verify your payment. If you completed the payment, please wait a moment and try again.' 
-            : 'No pudimos verificar su pago. Si completó el pago, espere un momento e intente de nuevo.',
+            : 'No pudimos verificar su pago. Si completo el pago, espere un momento e intente de nuevo.',
           [
-            { 
-              text: language === 'en' ? 'Try Again' : 'Intentar de Nuevo', 
-              onPress: () => verifyPayment() 
-            },
-            { 
-              text: language === 'en' ? 'Pay Again' : 'Pagar de Nuevo', 
-              onPress: () => {
-                setPaymentStatus('ready');
-                initializePayment(); // Create new session
-              }
-            },
-            { 
-              text: language === 'en' ? 'Cancel' : 'Cancelar', 
-              style: 'cancel',
-              onPress: () => setPaymentStatus('ready')
-            }
+            { text: language === 'en' ? 'Try Again' : 'Intentar de Nuevo', onPress: () => verifyStripePayment() },
+            { text: language === 'en' ? 'Pay Again' : 'Pagar de Nuevo', onPress: () => { setPaymentStatus('ready'); initializePayment(); }},
+            { text: language === 'en' ? 'Cancel' : 'Cancelar', style: 'cancel', onPress: () => setPaymentStatus('ready') }
           ]
         );
       }
@@ -172,30 +230,35 @@ export default function PaymentScreen() {
       console.error('Verification error:', error);
       setPaymentStatus('ready');
       Alert.alert(
-        language === 'en' ? 'Error' : 'Error',
+        'Error',
         language === 'en' ? 'Could not verify payment. Please try again.' : 'No se pudo verificar el pago. Por favor intente de nuevo.',
         [
-          { text: language === 'en' ? 'Try Again' : 'Intentar de Nuevo', onPress: () => verifyPayment() },
+          { text: language === 'en' ? 'Try Again' : 'Intentar de Nuevo', onPress: () => verifyStripePayment() },
           { text: language === 'en' ? 'Cancel' : 'Cancelar', style: 'cancel' }
         ]
       );
     }
   };
 
-  const completePayment = async () => {
-    if (!currentSessionId) return;
+  // ============= Common: Complete Payment =============
+  const handlePayment = () => {
+    if (isIOS) {
+      handleAppleIAPPayment();
+    } else {
+      handleStripePayment();
+    }
+  };
 
+  const completePayment = async () => {
     try {
       setPaymentStatus('success');
-      setPaymentIntentId(currentSessionId);
+      setPaymentIntentId(currentSessionId || 'iap_purchase');
       setPaymentComplete(true);
       
-      // Save this app as purchased with 48h expiration
       if (selectedApp) {
         addPurchase(selectedApp);
       }
       
-      // Use AI to search for fresh zip codes, fallback to existing data
       let zipCodesData;
       try {
         const aiResult = await searchZipCodesWithAI(selectedApp!);
@@ -265,12 +328,12 @@ export default function PaymentScreen() {
           <Text style={styles.successSubtitle}>
             {language === 'en' 
               ? 'Your payment has been confirmed!' 
-              : '¡Su pago ha sido confirmado!'}
+              : 'Su pago ha sido confirmado!'}
           </Text>
           <Text style={styles.successMessage}>
             {language === 'en' 
               ? 'Loading your zip codes and guides...' 
-              : 'Cargando sus códigos postales y guías...'}
+              : 'Cargando sus codigos postales y guias...'}
           </Text>
           <ActivityIndicator size="large" color={COLORS.accent} style={{ marginTop: 30 }} />
         </View>
@@ -321,9 +384,14 @@ export default function PaymentScreen() {
           <View style={styles.readyNotice}>
             <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
             <Text style={styles.readyNoticeText}>
-              {language === 'en' 
-                ? 'Ready! Tap below to open secure Stripe payment page' 
-                : '¡Listo! Toque abajo para abrir la página de pago seguro de Stripe'}
+              {isIOS
+                ? (language === 'en' 
+                    ? 'Ready! Tap below to purchase via App Store' 
+                    : 'Listo! Toque abajo para comprar via App Store')
+                : (language === 'en' 
+                    ? 'Ready! Tap below to open secure Stripe payment page' 
+                    : 'Listo! Toque abajo para abrir la pagina de pago seguro de Stripe')
+              }
             </Text>
           </View>
         )}
@@ -333,9 +401,10 @@ export default function PaymentScreen() {
           <View style={styles.loadingNotice}>
             <ActivityIndicator size="small" color={COLORS.accent} />
             <Text style={styles.loadingNoticeText}>
-              {language === 'en' 
-                ? 'Preparing secure payment...' 
-                : 'Preparando pago seguro...'}
+              {isIOS
+                ? (language === 'en' ? 'Connecting to App Store...' : 'Conectando con App Store...')
+                : (language === 'en' ? 'Preparing secure payment...' : 'Preparando pago seguro...')
+              }
             </Text>
           </View>
         )}
@@ -343,7 +412,12 @@ export default function PaymentScreen() {
         {/* Security Badge */}
         <View style={styles.securityBadge}>
           <Ionicons name="shield-checkmark" size={20} color={COLORS.accent} />
-          <Text style={styles.securityText}>{t('payment.secure')}</Text>
+          <Text style={styles.securityText}>
+            {isIOS
+              ? (language === 'en' ? 'Secure purchase via Apple' : 'Compra segura via Apple')
+              : t('payment.secure')
+            }
+          </Text>
         </View>
 
         {/* Pay Button */}
@@ -369,64 +443,103 @@ export default function PaymentScreen() {
             </>
           ) : (
             <>
-              <Ionicons name="card" size={24} color="#fff" />
+              <Ionicons name={isIOS ? "logo-apple" : "card"} size={24} color="#fff" />
               <Text style={styles.payButtonText}>
-                {language === 'en' ? 'Pay $20.00 Securely' : 'Pagar $20.00 de Forma Segura'}
+                {isIOS
+                  ? (language === 'en' ? 'Purchase $20.00' : 'Comprar $20.00')
+                  : (language === 'en' ? 'Pay $20.00 Securely' : 'Pagar $20.00 de Forma Segura')
+                }
               </Text>
             </>
           )}
         </TouchableOpacity>
 
-        {/* Already Paid Button - Always visible when ready */}
-        {(paymentStatus === 'ready' || paymentStatus === 'processing') && currentSessionId && (
+        {/* Already Paid Button - Only for Stripe (Android) */}
+        {!isIOS && (paymentStatus === 'ready' || paymentStatus === 'processing') && currentSessionId && (
           <TouchableOpacity
             style={styles.verifyButton}
-            onPress={verifyPayment}
+            onPress={verifyStripePayment}
             disabled={paymentStatus === 'processing'}
           >
             <Ionicons name="checkmark-done" size={20} color={COLORS.accent} />
             <Text style={styles.verifyButtonText}>
-              {language === 'en' ? 'I Already Paid - Verify Payment' : 'Ya Pagué - Verificar Pago'}
+              {language === 'en' ? 'I Already Paid - Verify Payment' : 'Ya Pague - Verificar Pago'}
             </Text>
           </TouchableOpacity>
         )}
 
-        {/* Supported Cards */}
-        <View style={styles.supportedCards}>
-          <Text style={styles.supportedCardsTitle}>
-            {language === 'en' ? 'Accepted Cards' : 'Tarjetas Aceptadas'}
-          </Text>
-          <View style={styles.cardLogos}>
-            <View style={[styles.cardLogo, { backgroundColor: '#1A1F71' }]}>
-              <Text style={styles.cardLogoText}>VISA</Text>
-            </View>
-            <View style={[styles.cardLogo, { backgroundColor: '#EB001B' }]}>
-              <Text style={styles.cardLogoText}>MC</Text>
-            </View>
-            <View style={[styles.cardLogo, { backgroundColor: '#006FCF' }]}>
-              <Text style={styles.cardLogoText}>AMEX</Text>
-            </View>
-            <View style={[styles.cardLogo, { backgroundColor: '#FF6000' }]}>
-              <Text style={styles.cardLogoText}>DISC</Text>
-            </View>
-          </View>
-        </View>
+        {/* Restore Purchases - Only for iOS */}
+        {isIOS && paymentStatus === 'ready' && (
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={async () => {
+              try {
+                const purchases = await appleIAPService.restorePurchases();
+                if (purchases.length > 0) {
+                  Alert.alert(
+                    language === 'en' ? 'Purchases Restored' : 'Compras Restauradas',
+                    language === 'en' ? 'Your previous purchases have been restored.' : 'Sus compras anteriores han sido restauradas.'
+                  );
+                } else {
+                  Alert.alert(
+                    language === 'en' ? 'No Purchases Found' : 'No se Encontraron Compras',
+                    language === 'en' ? 'No previous purchases were found for this account.' : 'No se encontraron compras anteriores para esta cuenta.'
+                  );
+                }
+              } catch (error) {
+                Alert.alert('Error', language === 'en' ? 'Could not restore purchases.' : 'No se pudieron restaurar las compras.');
+              }
+            }}
+          >
+            <Ionicons name="refresh" size={18} color={COLORS.textMuted} />
+            <Text style={styles.restoreButtonText}>
+              {language === 'en' ? 'Restore Purchases' : 'Restaurar Compras'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
-        {/* Stripe Logo */}
-        <View style={styles.stripeInfo}>
-          <Ionicons name="lock-closed" size={14} color={COLORS.textMuted} />
-          <Text style={styles.stripeText}>
-            {language === 'en' ? 'Secure payments by' : 'Pagos seguros por'} 
-          </Text>
-          <Text style={styles.stripeBrand}>Stripe</Text>
+        {/* Payment Method Info */}
+        <View style={styles.paymentInfo}>
+          {isIOS ? (
+            <>
+              <Ionicons name="logo-apple" size={20} color={COLORS.textMuted} />
+              <Text style={styles.paymentInfoText}>
+                {language === 'en' ? 'Payment processed by Apple' : 'Pago procesado por Apple'}
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.supportedCards}>
+                <Text style={styles.supportedCardsTitle}>
+                  {language === 'en' ? 'Accepted Cards' : 'Tarjetas Aceptadas'}
+                </Text>
+                <View style={styles.cardLogos}>
+                  <View style={[styles.cardLogo, { backgroundColor: '#1A1F71' }]}>
+                    <Text style={styles.cardLogoText}>VISA</Text>
+                  </View>
+                  <View style={[styles.cardLogo, { backgroundColor: '#EB001B' }]}>
+                    <Text style={styles.cardLogoText}>MC</Text>
+                  </View>
+                  <View style={[styles.cardLogo, { backgroundColor: '#006FCF' }]}>
+                    <Text style={styles.cardLogoText}>AMEX</Text>
+                  </View>
+                </View>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Security Notice */}
         <View style={styles.securityNotice}>
           <Text style={styles.securityNoticeText}>
-            {language === 'en' 
-              ? 'Your payment is processed securely by Stripe. We never see or store your card information.' 
-              : 'Su pago es procesado de forma segura por Stripe. Nunca vemos ni guardamos la información de su tarjeta.'}
+            {isIOS
+              ? (language === 'en' 
+                  ? 'Your payment is processed securely by Apple. We never see or store your payment information.' 
+                  : 'Su pago es procesado de forma segura por Apple. Nunca vemos ni guardamos su informacion de pago.')
+              : (language === 'en' 
+                  ? 'Your payment is processed securely by Stripe. We never see or store your card information.' 
+                  : 'Su pago es procesado de forma segura por Stripe. Nunca vemos ni guardamos la informacion de su tarjeta.')
+            }
           </Text>
         </View>
 
@@ -641,9 +754,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  restoreButtonText: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    marginLeft: 8,
+    textDecorationLine: 'underline',
+  },
+  paymentInfo: {
+    alignItems: 'center',
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  paymentInfoText: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+    marginLeft: 8,
+  },
   supportedCards: {
     alignItems: 'center',
-    marginBottom: 20,
   },
   supportedCardsTitle: {
     fontSize: 12,
@@ -663,22 +800,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
-  },
-  stripeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  stripeText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginLeft: 6,
-  },
-  stripeBrand: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.textSecondary,
-    marginLeft: 4,
   },
   securityNotice: {
     backgroundColor: COLORS.surface,
