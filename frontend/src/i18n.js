@@ -238,6 +238,9 @@ const resources = {
       "nav.faq": "FAQ",
       "nav.downloadAPK": "Descargar APK",
       "nav.tagline": "Encuentra tu Gig",
+      "nav.download": "Descargar",
+      "nav.buyNow": "Comprar Ahora",
+      "nav.home": "Inicio",
       
       // Hero
       "hero.badge": "Maximiza tus ganancias en delivery",
@@ -461,6 +464,9 @@ const resources = {
       "nav.faq": "FAQ",
       "nav.downloadAPK": "Baixar APK",
       "nav.tagline": "Encontre seu Gig",
+      "nav.download": "Baixar",
+      "nav.buyNow": "Comprar Agora",
+      "nav.home": "Inicio",
       
       // Hero
       "hero.badge": "Maximize seus ganhos em delivery",
@@ -531,6 +537,7 @@ const resources = {
       "pricing.title2": "Transparentes",
       "pricing.subtitle": "Pagamento de $20 por app. Sem assinaturas. Sem surpresas.",
       "pricing.badge": "OFERTA DE LANÇAMENTO",
+      "pricing.launchOffer": "OFERTA DE LANÇAMENTO",
       "pricing.perApp": "Pagamento por App",
       "pricing.oneTime": "Pagamento de $20 • Sem mensalidades",
       "pricing.includes": "Sua compra inclui:",
@@ -542,10 +549,12 @@ const resources = {
       "pricing.feature5": "Aviso importante sobre disponibilidade",
       
       "pricing.secure": "Pagamento seguro com Stripe",
-      "pricing.secureDesc": "Processamento seguro de pagamentos. Seus dados estão protegidos. Não armazenamos nem guardamos dados de pagamento ou cartões.",
+      "pricing.secureDescription": "Processamento seguro de pagamentos. Seus dados estao protegidos. Nao armazenamos nem guardamos dados de pagamento ou cartoes.",
       
       "pricing.cta": "Baixar e Começar Agora",
       "pricing.note": "Download grátis • Pague apenas quando escolher seu app",
+      "pricing.ctaSubtitle": "Download grátis • Pague apenas quando escolher seu app",
+      "pricing.paymentMethods": "Métodos de pagamento aceitos:",
       
       "pricing.methods": "Métodos de pagamento aceitos:",
       

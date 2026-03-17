@@ -1,13 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Check, Sparkles, ShieldCheck, ShoppingBag, Truck, Package } from 'lucide-react';
+import { Check, Sparkles, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { Button } from './ui/button';
 
 const APPS = [
-  { key: 'instacart', name: 'Instacart', Icon: ShoppingBag, gradient: 'from-emerald-500 to-green-600', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-  { key: 'doordash', name: 'DoorDash', Icon: Truck, gradient: 'from-red-500 to-rose-600', bg: 'bg-red-500/10', border: 'border-red-500/30' },
-  { key: 'spark', name: 'Spark Driver', Icon: Package, gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
+  { key: 'instacart', name: 'Instacart', Icon: ShoppingBag, gradient: 'from-emerald-500 to-green-600' },
+  { key: 'doordash', name: 'DoorDash', Icon: ShoppingBag, gradient: 'from-red-500 to-rose-600' },
+  { key: 'spark', name: 'Spark Driver', Icon: ShoppingBag, gradient: 'from-blue-500 to-indigo-600' },
 ];
 
 export const Pricing = () => {

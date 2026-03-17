@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Phone, BookOpen, Zap, Shield, TrendingUp } from 'lucide-react';
+import { MapPin, Phone, BookOpen, Zap, Shield, TrendingUp, ShoppingBag, Truck, Package } from 'lucide-react';
 
 export const Features = () => {
   const { t } = useTranslation();
@@ -115,18 +115,20 @@ export const Features = () => {
 
         {/* Apps Supported */}
         <div className="mt-20 text-center">
-          <p className="text-gray-400 mb-8 text-lg">Apps Compatibles:</p>
+          <p className="text-gray-400 mb-8 text-lg">{t('features.apps')}</p>
           <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12">
             {[
-              { name: 'Instacart', icon: '🛒', color: 'green' },
-              { name: 'DoorDash', icon: '🍕', color: 'red' },
-              { name: 'Spark Driver', icon: '🚗', color: 'yellow' },
+              { name: 'Instacart', Icon: ShoppingBag, color: 'from-emerald-500 to-green-500' },
+              { name: 'DoorDash', Icon: Truck, color: 'from-red-500 to-rose-500' },
+              { name: 'Spark Driver', Icon: Package, color: 'from-amber-500 to-yellow-500' },
             ].map((app, index) => (
               <div 
                 key={index}
-                className="flex items-center gap-3 bg-[#1e293b] px-6 py-4 rounded-full border border-cyan-500/20 hover:border-cyan-500/50 transition-all hover:scale-105"
+                className="flex items-center gap-4 bg-[#1e293b] px-8 py-5 rounded-full border border-cyan-500/20 hover:border-cyan-500/50 transition-all hover:scale-105"
               >
-                <span className="text-3xl">{app.icon}</span>
+                <div className={`bg-gradient-to-br ${app.color} p-2.5 rounded-xl`}>
+                  <app.Icon size={22} className="text-white" />
+                </div>
                 <span className="text-white font-semibold text-lg">{app.name}</span>
               </div>
             ))}
