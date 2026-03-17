@@ -165,32 +165,32 @@ export const DownloadApps = () => {
 
           <div className="text-center text-gray-500 text-sm py-2">{t.or}</div>
 
-          {/* Store Links with real logos */}
+          {/* Store Links with official badge style */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-[#1e293b] rounded-2xl p-5 border border-gray-700/50 opacity-70 flex items-center gap-3" data-testid="play-store-btn">
-              <div className="bg-transparent p-1 flex-shrink-0">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
-                  <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92z" fill="#4285F4"/>
-                  <path d="M17.556 8.236l-3.764 3.764 3.764 3.764 4.246-2.396c.478-.27.478-.936 0-1.206l-4.246-2.926z" fill="#FBBC04"/>
-                  <path d="M3.609 1.814L14.856 8.55l-1.064 1.064L3.609 1.814z" fill="#34A853"/>
-                  <path d="M3.609 22.186L13.792 12l1.064 1.064-11.247 9.122z" fill="#EA4335"/>
-                </svg>
-              </div>
+            {/* Google Play Badge */}
+            <div className="bg-black rounded-xl p-4 border border-gray-600/50 opacity-70 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" data-testid="play-store-btn">
+              <svg viewBox="0 0 24 24" width="28" height="28" className="flex-shrink-0">
+                <path d="M3.176 2.123a1 1 0 00-.461.86v18.034a1 1 0 00.461.86l.058.033 10.1-10.1v-.01-.01L3.234 1.69l-.058.033z" fill="#4285F4"/>
+                <path d="M17.1 15.516l-3.766-3.766v-.02l3.766-3.766.085.049 4.463 2.535c1.274.724 1.274 1.908 0 2.632l-4.463 2.535-.085-.199z" fill="#FBBC04"/>
+                <path d="M17.185 15.715L13.334 11.75 3.176 21.877c.42.445 1.117.5 1.903.056l12.106-6.218z" fill="#EA4335"/>
+                <path d="M17.185 7.785L5.079 1.567c-.786-.444-1.483-.389-1.903.056l10.158 10.127 3.851-3.965z" fill="#34A853"/>
+              </svg>
               <div>
-                <div className="text-white font-semibold text-sm">{t.playStore}</div>
-                <div className="text-gray-500 text-xs">{t.playStoreSub}</div>
+                <div className="text-gray-400 text-[10px] leading-tight">GET IT ON</div>
+                <div className="text-white font-semibold text-sm leading-tight">{t.playStore}</div>
+                <div className="text-gray-500 text-[10px]">{t.playStoreSub}</div>
               </div>
             </div>
 
-            <div className="bg-[#1e293b] rounded-2xl p-5 border border-gray-700/50 opacity-70 flex items-center gap-3" data-testid="app-store-btn">
-              <div className="bg-transparent p-1 flex-shrink-0">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" className="text-white">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                </svg>
-              </div>
+            {/* App Store Badge */}
+            <div className="bg-black rounded-xl p-4 border border-gray-600/50 opacity-70 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" data-testid="app-store-btn">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="white" className="flex-shrink-0">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
               <div>
-                <div className="text-white font-semibold text-sm">{t.appStore}</div>
-                <div className="text-gray-500 text-xs">{t.appStoreSub}</div>
+                <div className="text-gray-400 text-[10px] leading-tight">Download on the</div>
+                <div className="text-white font-semibold text-sm leading-tight">{t.appStore}</div>
+                <div className="text-gray-500 text-[10px]">{t.appStoreSub}</div>
               </div>
             </div>
           </div>
