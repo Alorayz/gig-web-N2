@@ -9,7 +9,7 @@ export const PRODUCT_IDS = {
 };
 
 // Price in USD
-export const PRODUCT_PRICE = 19.99;
+export const PRODUCT_PRICE = 20.00;
 
 interface IAPProduct {
   productId: string;
