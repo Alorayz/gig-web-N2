@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, Home, Zap, HelpCircle, CreditCard, Download, ShoppingCart, MapPin } from 'lucide-react';
+import { Menu, X, Home, Zap, HelpCircle, CreditCard, Download, ShoppingCart } from 'lucide-react';
 import { Button } from './ui/button';
 import { LanguageSelector } from './LanguageSelector';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -44,9 +44,11 @@ export const Header = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20">
             <div className="flex items-center space-x-3 cursor-pointer" onClick={goHome} data-testid="logo">
-              <div className="h-10 w-10 sm:h-11 sm:w-11 bg-gradient-to-br from-cyan-400 to-green-400 rounded-xl flex items-center justify-center">
-                <MapPin className="text-[#0a1628]" size={22} strokeWidth={2.5} />
-              </div>
+              <img 
+                src="/images/logo.png" 
+                alt="GIG ZipFinder" 
+                className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl object-cover"
+              />
               <div className="flex flex-col">
                 <span className="text-xl sm:text-2xl font-bold">
                   <span className="text-cyan-400">GIG</span>

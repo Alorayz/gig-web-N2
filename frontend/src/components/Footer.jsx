@@ -49,9 +49,11 @@ export const Footer = () => {
           {/* Brand Column */}
           <div className="lg:col-span-2">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="h-12 w-12 bg-gradient-to-br from-cyan-400 to-green-400 rounded-xl flex items-center justify-center">
-                <MapPin className="text-[#0a1628]" size={24} strokeWidth={2.5} />
-              </div>
+              <img 
+                src="/images/logo.png" 
+                alt="GIG ZipFinder" 
+                className="h-12 w-12 rounded-xl object-cover"
+              />
               <div className="flex flex-col">
                 <span className="text-2xl font-bold">
                   <span className="text-cyan-400">GIG</span>
