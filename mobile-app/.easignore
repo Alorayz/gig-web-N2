@@ -1,0 +1,13 @@
+# EAS Build ignore file - overrides .gitignore for EAS builds
+# This ensures credentials.json and keystore files are included
+
+node_modules/
+.expo/
+dist/
+.cache/
+__pycache__/
+*.pyc
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
