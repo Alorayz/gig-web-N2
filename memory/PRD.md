@@ -11,19 +11,21 @@ Mobile/web app for gig economy workers providing AI-generated postal codes for h
 
 ## What's Been Implemented
 
-### Apple IAP Compliance Fix (COMPLETED - March 17, 2026)
-- Removed `@stripe/stripe-react-native` from app.json plugins AND package.json → Eliminates PassKit framework from iOS binary (fixes Guideline 2.1)
+### Apple IAP Compliance Fix (COMPLETED - March 18, 2026)
+- Removed `@stripe/stripe-react-native` from iOS build completely
 - Added `expo-iap` plugin for native iOS In-App Purchase support
-- Rewrote `payment.tsx` with platform detection: Apple IAP on iOS, Stripe URL on Android (fixes Guideline 3.1.1)
+- Rewrote `payment.tsx` with platform detection: Apple IAP on iOS, Stripe URL on Android
 - Added "Restore Purchases" button on iOS (Apple requirement)
-- iOS shows Apple logo + "Comprar $20.00" / Android shows card icon + "Pagar $20.00"
-- Backend `/api/iap/validate-receipt` endpoint verified working
+- iOS shows Apple logo + "Purchase $20.00" / Android shows card icon + "Pay $20.00"
+- Backend `/api/iap/validate-receipt` endpoint verified working with 15-day access
 - 3 IAP Product IDs: com.gigzipfinder.app.{instacart,doordash,spark}_codes
-- **Build v1.1.2 (build 6) initiated**: https://expo.dev/accounts/alorayz1/projects/gig-zipfinder/builds/dfa4480b-931f-4566-9844-18062ffdb6f5
+- **Duration updated from 48h to 15 days** across all mobile UI and backend IAP
+- **Build v1.1.3 (build 10)** submitted to App Store for review
 
 ### Web UI/UX Overhaul (COMPLETED)
 - Fixed translations, uniform Lucide icons, real Visa/MC/Amex SVGs, real Apple/Google store badges
 - Official app logo, sidebar menu, install guide, all 3 languages
+- Architecture diagram added to homepage
 
 ### Production (gig-web/) Files Updated
 - Features.jsx: uniform icons | Pricing.jsx: $20 + real card logos | DownloadSection.jsx: real store logos
@@ -33,8 +35,13 @@ Mobile/web app for gig economy workers providing AI-generated postal codes for h
 - `com.gigzipfinder.app.doordash_codes` - $20.00
 - `com.gigzipfinder.app.spark_codes` - $20.00
 
+## Builds History
+- v1.1.3 (build 10) - LATEST: App Store IPA + Simulator, 15 days access text
+- v1.1.3 (build 9) - Previous: Had 48h text still in some places
+- v1.1.0 (build 8) - Rejected version number (lower than existing 1.1.2)
+
 ## Pending Tasks
-- P0: Wait for iOS build to complete → download IPA → submit to App Store
-- P1: Deploy web changes to production (user needs to connect GitHub to Emergent)
-- P2: App Store Connect submission with Review Notes explaining IAP implementation
-- P3: Test IAP on physical iOS device with Sandbox Apple ID
+- P0: Wait for Apple review of v1.1.3 build 10
+- P1: Deploy web changes to production (user needs to push gig-web/ to their repo)
+- P2: Test IAP on physical iOS device with Sandbox Apple ID (via TestFlight)
+- P3: Update web frontend "48h" references if user wants consistency with mobile 15-day messaging
