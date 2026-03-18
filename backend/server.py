@@ -1904,7 +1904,7 @@ async def validate_apple_receipt(data: IAPReceiptValidation):
         "status": "succeeded",
         "receipt_data": data.receipt[:100] + "...",  # Store truncated for reference
         "created_at": datetime.utcnow(),
-        "expires_at": datetime.utcnow() + timedelta(hours=48)
+        "expires_at": datetime.utcnow() + timedelta(days=15)
     }
     
     await db.payments.insert_one(purchase_record)
@@ -1926,26 +1926,30 @@ async def get_iap_products():
             {
                 "product_id": "com.gigzipfinder.app.instacart_codes",
                 "name": "Instacart ZIP Codes",
-                "description": "5 AI-recommended ZIP codes for Instacart",
+                "description": "5 AI-recommended ZIP codes for Instacart - 15 days access",
                 "price": PRODUCT_PRICE_USD,
-                "currency": "USD"
+                "currency": "USD",
+                "access_duration_days": 15
             },
             {
                 "product_id": "com.gigzipfinder.app.doordash_codes",
                 "name": "DoorDash ZIP Codes", 
-                "description": "5 AI-recommended ZIP codes for DoorDash",
+                "description": "5 AI-recommended ZIP codes for DoorDash - 15 days access",
                 "price": PRODUCT_PRICE_USD,
-                "currency": "USD"
+                "currency": "USD",
+                "access_duration_days": 15
             },
             {
                 "product_id": "com.gigzipfinder.app.spark_codes",
                 "name": "Spark Driver ZIP Codes",
-                "description": "5 AI-recommended ZIP codes for Spark Driver",
+                "description": "5 AI-recommended ZIP codes for Spark Driver - 15 days access",
                 "price": PRODUCT_PRICE_USD,
-                "currency": "USD"
+                "currency": "USD",
+                "access_duration_days": 15
             }
         ],
-        "price_display": f"${PRODUCT_PRICE_USD:.2f} USD per app"
+        "price_display": f"${PRODUCT_PRICE_USD:.2f} USD per app",
+        "access_duration": "15 days"
     }
 
 # ============== WEB OFFICIAL INTEGRATION ==============

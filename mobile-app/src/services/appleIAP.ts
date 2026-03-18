@@ -8,144 +8,102 @@ export const PRODUCT_IDS = {
   SPARK_ZIP_CODES: 'com.gigzipfinder.app.spark_codes',
 };
 
-// Price in USD
 export const PRODUCT_PRICE = 20.00;
-
-interface IAPProduct {
-  productId: string;
-  title: string;
-  description: string;
-  price: string;
-  localizedPrice: string;
-  currency: string;
-}
-
-interface IAPPurchase {
-  productId: string;
-  transactionId: string;
-  transactionReceipt: string;
-  purchaseTime: number;
-}
+export const ACCESS_DURATION_DAYS = 15;
 
 class AppleIAPService {
   private connected: boolean = false;
-  private products: IAPProduct[] = [];
+  private products: any[] = [];
+  private purchaseListener: any = null;
+  private errorListener: any = null;
 
   async initialize(): Promise<boolean> {
-    if (Platform.OS !== 'ios') {
-      console.log('Apple IAP only available on iOS');
-      return false;
-    }
+    if (Platform.OS !== 'ios') return false;
 
     try {
-      const result = await ExpoIAP.initConnection();
-      this.connected = result;
-      
-      if (result) {
-        await this.fetchProducts();
-      }
-      
-      return result;
+      await ExpoIAP.initConnection();
+      this.connected = true;
+      await this.loadProducts();
+      return true;
     } catch (error) {
-      console.error('Failed to initialize IAP connection:', error);
+      console.error('IAP init error:', error);
+      this.connected = false;
       return false;
     }
   }
 
-  async fetchProducts(): Promise<IAPProduct[]> {
-    if (!this.connected) {
-      throw new Error('IAP not connected');
-    }
+  async loadProducts(): Promise<any[]> {
+    if (!this.connected) return [];
 
     try {
-      const productIds = Object.values(PRODUCT_IDS);
-      const products = await ExpoIAP.getProducts({ skus: productIds });
-      this.products = products as IAPProduct[];
+      const skus = Object.values(PRODUCT_IDS);
+      const products = await ExpoIAP.fetchProducts({ skus });
+      this.products = products || [];
       return this.products;
     } catch (error) {
-      console.error('Failed to fetch products:', error);
-      throw error;
+      console.error('Fetch products error:', error);
+      return [];
     }
   }
 
-  async purchaseProduct(productId: string): Promise<IAPPurchase | null> {
-    if (!this.connected) {
-      throw new Error('IAP not connected');
-    }
+  setupListeners(
+    onPurchase: (purchase: any) => void,
+    onError: (error: any) => void,
+  ) {
+    this.removeListeners();
+    this.purchaseListener = ExpoIAP.purchaseUpdatedListener((purchase) => {
+      onPurchase(purchase);
+    });
+    this.errorListener = ExpoIAP.purchaseErrorListener((error) => {
+      onError(error);
+    });
+  }
 
-    try {
-      const purchase = await ExpoIAP.requestPurchase({ sku: productId });
-      return purchase as IAPPurchase;
-    } catch (error: any) {
-      if (error.code === 'E_USER_CANCELLED') {
-        console.log('User cancelled purchase');
-        return null;
-      }
-      console.error('Purchase failed:', error);
-      throw error;
+  removeListeners() {
+    if (this.purchaseListener) {
+      this.purchaseListener.remove();
+      this.purchaseListener = null;
+    }
+    if (this.errorListener) {
+      this.errorListener.remove();
+      this.errorListener = null;
     }
   }
 
-  async finishTransaction(purchase: IAPPurchase): Promise<void> {
-    try {
-      await ExpoIAP.finishTransaction({
-        purchase,
-        isConsumable: true, // ZIP codes are consumable (one-time use per purchase)
-      });
-    } catch (error) {
-      console.error('Failed to finish transaction:', error);
-      throw error;
-    }
+  async purchase(productId: string): Promise<void> {
+    if (!this.connected) throw new Error('IAP not connected');
+
+    await ExpoIAP.requestPurchase({
+      request: {
+        apple: { sku: productId },
+      },
+    });
+    // Result comes through purchaseUpdatedListener, not here
   }
 
-  async validateReceipt(receipt: string, productId: string): Promise<boolean> {
-    try {
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/iap/validate-receipt`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            receipt,
-            product_id: productId,
-            platform: 'ios',
-          }),
-        }
-      );
-
-      const data = await response.json();
-      return data.is_valid === true;
-    } catch (error) {
-      console.error('Receipt validation failed:', error);
-      return false;
-    }
+  async finish(purchase: any): Promise<void> {
+    await ExpoIAP.finishTransaction({
+      purchase,
+      isConsumable: true,
+    });
   }
 
-  async restorePurchases(): Promise<IAPPurchase[]> {
-    if (!this.connected) {
-      throw new Error('IAP not connected');
-    }
-
+  async restore(): Promise<any[]> {
+    if (!this.connected) return [];
     try {
       const purchases = await ExpoIAP.getAvailablePurchases();
-      return purchases as IAPPurchase[];
+      return purchases || [];
     } catch (error) {
-      console.error('Failed to restore purchases:', error);
-      throw error;
+      console.error('Restore error:', error);
+      return [];
     }
   }
 
-  getProducts(): IAPProduct[] {
-    return this.products;
-  }
+  getProducts() { return this.products; }
+  isConnected() { return this.connected; }
 
-  isConnected(): boolean {
-    return this.connected;
-  }
-
-  async disconnect(): Promise<void> {
+  async disconnect() {
+    this.removeListeners();
     if (this.connected) {
       await ExpoIAP.endConnection();
       this.connected = false;
