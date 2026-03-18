@@ -273,8 +273,8 @@ export default function HomeScreen() {
         <View style={styles.priceInfoContainer}>
           <Text style={styles.priceInfo}>
             {language === 'en' 
-              ? '$20.00 per app • 48h Access' 
-              : '$20.00 por app • Acceso 48h'}
+              ? '$20.00 per app • 15 Days Access' 
+              : '$20.00 por app • Acceso 15 Días'}
           </Text>
           <Text style={styles.priceSubInfo}>
             {language === 'en' 

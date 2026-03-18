@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gigzipfinder.app",
-      "buildNumber": "9",
+      "buildNumber": "10",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents for verification",
         "NSPhotoLibraryUsageDescription": "Upload profile photos",

@@ -285,7 +285,7 @@ export default function PaymentScreen() {
 
   const durationText = isIOS 
     ? (language === 'en' ? `${ACCESS_DURATION_DAYS} days access` : `${ACCESS_DURATION_DAYS} dias de acceso`)
-    : (language === 'en' ? '48 hours access' : '48 horas de acceso');
+    : (language === 'en' ? '15 days access' : '15 días de acceso');
 
   return (
     <SafeAreaView style={styles.container}>

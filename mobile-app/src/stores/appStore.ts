@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface PurchaseInfo {
   appName: string;
   purchasedAt: number; // timestamp
-  expiresAt: number; // timestamp (48 hours after purchase)
+  expiresAt: number; // timestamp (15 days after purchase)
 }
 
 interface AppState {
@@ -40,8 +40,8 @@ interface AppState {
   resetForNewPurchase: () => void;
 }
 
-// 48 hours in milliseconds
-const PURCHASE_DURATION_MS = 48 * 60 * 60 * 1000;
+// 15 days in milliseconds
+const PURCHASE_DURATION_MS = 15 * 24 * 60 * 60 * 1000;
 
 // Generate a simple device ID
 const generateDeviceId = () => {
