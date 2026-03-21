@@ -23,14 +23,16 @@ type TabType = 'zipcodes' | 'guide' | 'voice';
 export default function ResultsScreen() {
   const router = useRouter();
   const { language, t } = useLanguageStore();
-  const { selectedApp, zipCodes, guides, voiceGuides, paymentComplete, reset } = useAppStore();
+  const { selectedApp, zipCodes, guides, voiceGuides, paymentComplete, isAppActive, reset } = useAppStore();
   const [activeTab, setActiveTab] = useState<TabType>('zipcodes');
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     // Verify payment was completed before showing results
+    // Check both transient paymentComplete AND persistent purchases
     const timer = setTimeout(() => {
-      if (!paymentComplete || !selectedApp) {
+      const hasActiveAccess = selectedApp && isAppActive(selectedApp);
+      if ((!paymentComplete && !hasActiveAccess) || !selectedApp) {
         Alert.alert(
           language === 'en' ? 'Access Denied' : 'Acceso Denegado',
           language === 'en' 

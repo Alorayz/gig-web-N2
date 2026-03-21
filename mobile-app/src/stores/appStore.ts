@@ -170,6 +170,11 @@ export const useAppStore = create<AppState>()(
         deviceId: state.deviceId,
         purchases: state.purchases,
         lastSessionId: state.lastSessionId,
+        selectedApp: state.selectedApp,
+        paymentComplete: state.paymentComplete,
+        zipCodes: state.zipCodes,
+        guides: state.guides,
+        voiceGuides: state.voiceGuides,
       }),
     }
   )

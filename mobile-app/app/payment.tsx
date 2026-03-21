@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  AppState,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -176,23 +177,58 @@ export default function PaymentScreen() {
 
     try {
       await Linking.openURL(checkoutUrl);
-      setTimeout(() => {
-        Alert.alert(
-          language === 'en' ? 'Complete Payment' : 'Completar Pago',
-          language === 'en' 
-            ? 'After completing payment in Stripe, tap "I Already Paid".' 
-            : 'Despues de completar el pago en Stripe, toque "Ya Pague".',
-          [
-            { text: language === 'en' ? 'I Already Paid' : 'Ya Pague', onPress: verifyStripe },
-            { text: language === 'en' ? 'Cancel' : 'Cancelar', style: 'cancel', onPress: () => setPaymentStatus('ready') },
-          ]
-        );
-      }, 1000);
+      // Don't show alert immediately - use AppState listener instead
     } catch (error: any) {
       setPaymentStatus('failed');
       Alert.alert('Error', error.message || 'Could not open payment');
     }
   };
+
+  // Auto-verify when app returns from background (after Stripe checkout)
+  useEffect(() => {
+    if (isIOS) return; // Only for Android Stripe flow
+    
+    const handleAppState = async (nextState: string) => {
+      if (nextState === 'active' && currentSessionId && paymentStatus === 'processing') {
+        // App came back to foreground after Stripe checkout
+        // Give Stripe a moment to process
+        setTimeout(async () => {
+          try {
+            const result = await verifyCheckoutSession(currentSessionId);
+            if (result.status === 'succeeded') {
+              await completePayment();
+            } else {
+              // Payment not yet completed - show manual verify option
+              Alert.alert(
+                language === 'en' ? 'Verify Payment' : 'Verificar Pago',
+                language === 'en' 
+                  ? 'Did you complete the payment?' 
+                  : '¿Completaste el pago?',
+                [
+                  { text: language === 'en' ? 'Yes, Verify' : 'Sí, Verificar', onPress: verifyStripe },
+                  { text: language === 'en' ? 'Not Yet' : 'Aún No', style: 'cancel', onPress: () => setPaymentStatus('ready') },
+                ]
+              );
+            }
+          } catch (error) {
+            Alert.alert(
+              language === 'en' ? 'Verify Payment' : 'Verificar Pago',
+              language === 'en' 
+                ? 'Tap "Verify" after completing payment.' 
+                : 'Toca "Verificar" después de completar el pago.',
+              [
+                { text: language === 'en' ? 'Verify' : 'Verificar', onPress: verifyStripe },
+                { text: language === 'en' ? 'Cancel' : 'Cancelar', style: 'cancel', onPress: () => setPaymentStatus('ready') },
+              ]
+            );
+          }
+        }, 1500);
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppState);
+    return () => subscription.remove();
+  }, [currentSessionId, paymentStatus, language]);
 
   const verifyStripe = async () => {
     if (!currentSessionId) return;
