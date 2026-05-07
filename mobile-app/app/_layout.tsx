@@ -98,14 +98,6 @@ export default function RootLayout() {
           name="results" 
           options={{ title: 'Your Results' }} 
         />
-        <Stack.Screen 
-          name="admin/login" 
-          options={{ title: 'Admin Login' }} 
-        />
-        <Stack.Screen 
-          name="admin/dashboard" 
-          options={{ title: 'Admin Dashboard' }} 
-        />
       </Stack>
     </>
   );

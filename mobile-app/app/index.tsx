@@ -282,15 +282,6 @@ export default function HomeScreen() {
               : 'Guías + 5 Códigos Postales'}
           </Text>
         </View>
-
-        {/* Admin Access */}
-        <TouchableOpacity
-          style={styles.adminButton}
-          onPress={handleAdminAccess}
-        >
-          <Ionicons name="shield-checkmark" size={16} color={COLORS.textMuted} />
-          <Text style={styles.adminButtonText}>{t('app.adminAccess')}</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* Language Modal */}
