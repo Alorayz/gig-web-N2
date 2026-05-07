@@ -43,7 +43,6 @@ const translations: Record<string, Record<string, string>> = {
     'app.description': 'Get access to zip codes with availability for Instacart, DoorDash, and Spark Driver plus step-by-step guides!',
     'app.getStarted': 'Get Started - $20.00',
     'app.selectLanguage': 'Select Language',
-    'app.adminAccess': 'Admin Access',
     
     // Select App Screen
     'select.title': 'Select Your App',
@@ -89,24 +88,6 @@ const translations: Record<string, Record<string, string>> = {
     'results.backHome': 'Back to Home',
     'results.downloadPdf': 'Download PDF Guide',
     
-    // Admin
-    'admin.login': 'Admin Login',
-    'admin.username': 'Username',
-    'admin.password': 'Password',
-    'admin.totpCode': '2FA Code (Google Authenticator)',
-    'admin.loginBtn': 'Login',
-    'admin.dashboard': 'Admin Dashboard',
-    'admin.payments': 'Payments',
-    'admin.zipCodes': 'Zip Codes',
-    'admin.guides': 'Guides',
-    'admin.stats': 'Statistics',
-    'admin.logout': 'Logout',
-    'admin.totalRevenue': 'Total Revenue',
-    'admin.totalPayments': 'Total Payments',
-    'admin.successfulPayments': 'Successful',
-    'admin.aiSearch': 'AI Search',
-    'admin.addZipCode': 'Add Zip Code',
-    
     // General
     'general.loading': 'Loading...',
     'general.error': 'An error occurred',
@@ -125,7 +106,6 @@ const translations: Record<string, Record<string, string>> = {
     'app.description': '¡Obtén acceso a códigos postales con disponibilidad para Instacart, DoorDash y Spark Driver más guías paso a paso!',
     'app.getStarted': 'Comenzar - $20.00',
     'app.selectLanguage': 'Seleccionar Idioma',
-    'app.adminAccess': 'Acceso Admin',
     
     // Select App Screen
     'select.title': 'Selecciona Tu App',
@@ -170,24 +150,6 @@ const translations: Record<string, Record<string, string>> = {
     'results.tryAnother': 'Probar Otra App',
     'results.backHome': 'Volver al Inicio',
     'results.downloadPdf': 'Descargar Guía PDF',
-    
-    // Admin
-    'admin.login': 'Acceso Admin',
-    'admin.username': 'Usuario',
-    'admin.password': 'Contraseña',
-    'admin.totpCode': 'Código 2FA (Google Authenticator)',
-    'admin.loginBtn': 'Iniciar Sesión',
-    'admin.dashboard': 'Panel de Admin',
-    'admin.payments': 'Pagos',
-    'admin.zipCodes': 'Códigos Postales',
-    'admin.guides': 'Guías',
-    'admin.stats': 'Estadísticas',
-    'admin.logout': 'Cerrar Sesión',
-    'admin.totalRevenue': 'Ingresos Totales',
-    'admin.totalPayments': 'Total de Pagos',
-    'admin.successfulPayments': 'Exitosos',
-    'admin.aiSearch': 'Búsqueda IA',
-    'admin.addZipCode': 'Agregar Código Postal',
     
     // General
     'general.loading': 'Cargando...',

@@ -23,7 +23,7 @@ export default function PaymentSuccessScreen() {
     setZipCodes,
     setGuides,
     setVoiceGuides,
-    addPaidApp,
+    addPurchase,
   } = useAppStore();
   
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
@@ -54,7 +54,7 @@ export default function PaymentSuccessScreen() {
         // Save payment info
         if (appName) {
           setSelectedApp(appName);
-          addPaidApp(appName);
+          addPurchase(appName);
         }
         setPaymentComplete(true);
         setPaymentIntentId(sessionId);

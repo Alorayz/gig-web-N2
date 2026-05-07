@@ -85,10 +85,6 @@ export default function HomeScreen() {
     router.push('/select-app');
   };
 
-  const handleAdminAccess = () => {
-    router.push('/admin/login');
-  };
-
   const handleAccessPurchase = async (appName: string) => {
     try {
       setSelectedApp(appName);
@@ -577,17 +573,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textMuted,
     marginTop: 4,
-  },
-  adminButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  adminButtonText: {
-    color: COLORS.textMuted,
-    fontSize: 14,
-    marginLeft: 8,
   },
   modalOverlay: {
     flex: 1,

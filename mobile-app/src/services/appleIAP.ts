@@ -1,13 +1,19 @@
 import * as ExpoIAP from 'expo-iap';
 import { Platform } from 'react-native';
 
+export const PRODUCT_IDS = {
+  INSTACART_ZIP_CODES: 'com.gigzipfinder.app.instacart_codes',
+  DOORDASH_ZIP_CODES: 'com.gigzipfinder.app.doordash_codes',
+  SPARK_ZIP_CODES: 'com.gigzipfinder.app.spark_codes',
+};
+
 const APPLE_PRODUCT_IDS = [
-  'com.gigzipfinder.app.instacart_codes',
-  'com.gigzipfinder.app.doordash_codes',
-  'com.gigzipfinder.app.spark_codes',
+  PRODUCT_IDS.INSTACART_ZIP_CODES,
+  PRODUCT_IDS.DOORDASH_ZIP_CODES,
+  PRODUCT_IDS.SPARK_ZIP_CODES,
 ];
 
-const ACCESS_DURATION_DAYS = 15;
+export const ACCESS_DURATION_DAYS = 15;
 
 class AppleIAPService {
   private products: any[] = [];
@@ -69,10 +75,11 @@ class AppleIAPService {
 
       // Fetch products
       try {
-        this.products = await ExpoIAP.fetchProducts({
+        const fetched = await ExpoIAP.fetchProducts({
           skus: APPLE_PRODUCT_IDS,
           type: 'in-app',
         });
+        this.products = (fetched as any[]) || [];
         console.log('[IAP] Products fetched:', this.products?.length || 0);
       } catch (fetchErr) {
         console.warn('[IAP] Fetch products error (non-fatal):', fetchErr);
@@ -146,6 +153,11 @@ class AppleIAPService {
       console.warn('[IAP] Restore purchases error:', error);
       return [];
     }
+  }
+
+  /** Alias used by UI to restore previously made purchases. */
+  async restore(): Promise<any[]> {
+    return this.restorePurchases();
   }
 
   getProducts() {

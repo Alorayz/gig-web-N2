@@ -11,6 +11,17 @@ Mobile/web app for gig economy workers providing AI-generated postal codes for h
 
 ## What's Been Implemented
 
+### Apple Guideline 2.1 Compliance Fix - Admin Login Removal (Feb 2026)
+- **Removed**: `app/admin/` directory (login.tsx + dashboard.tsx files deleted)
+- **Removed**: `src/stores/adminStore.ts` (admin Zustand store deleted)
+- **Removed**: All admin API helpers from `src/services/api.ts` (adminLogin, adminRegister, adminLogout, getAdminStats, getAdminPayments, getAllZipCodes, createZipCode, deleteZipCode, triggerAISearch, rotateZipCodes, checkRotationStatus)
+- **Removed**: All `admin.*` and `app.adminAccess` translation keys from `src/stores/languageStore.ts` (English + Spanish)
+- **Removed**: `handleAdminAccess` handler and `adminButton`/`adminButtonText` styles from `app/index.tsx`
+- **Fixed compile errors**: Added named exports `PRODUCT_IDS`, `ACCESS_DURATION_DAYS`, and `restore()` alias in `src/services/appleIAP.ts`; renamed `addPaidApp` → `addPurchase` in `app/payment-success.tsx`
+- **Bumped iOS buildNumber** 13 → 14 in `app.json`
+- **Resolution Center response** drafted at `/app/memory/apple_resolution_response.md` (English + Spanish)
+- **Status**: Ready to build iOS — awaiting user confirmation
+
 ### Critical Bug Fix: Payment Flow (March 21, 2026)
 - **Fixed**: Stripe API key expired → Updated to new key in backend
 - **Fixed**: Payment completes but codes don't show → `paymentComplete` and `selectedApp` now persisted in AsyncStorage
