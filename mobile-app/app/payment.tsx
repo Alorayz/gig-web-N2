@@ -122,6 +122,7 @@ export default function PaymentScreen() {
 
     return () => {
       appleIAPService.removeListeners();
+      appleIAPService.cleanup();
     };
   }, [selectedApp, language]);
 
