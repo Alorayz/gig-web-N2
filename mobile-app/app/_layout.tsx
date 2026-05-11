@@ -4,11 +4,25 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import * as Linking from 'expo-linking';
+import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
+
+// Prevent the splash screen from auto-hiding before we explicitly tell it to.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* ignore — splash screen may already be hidden */
+});
 
 export default function RootLayout() {
   const { isLoading } = useLanguageStore();
   const router = useRouter();
+
+  useEffect(() => {
+    // Hide the splash screen as soon as the root layout mounts, so the app
+    // never appears "frozen" if a downstream network call is slow.
+    SplashScreen.hideAsync().catch(() => {
+      /* ignore — splash screen may already be hidden */
+    });
+  }, []);
 
   useEffect(() => {
     // Handle deep links

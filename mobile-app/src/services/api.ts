@@ -4,6 +4,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://alorayz-gig
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
+  timeout: 10000, // 10 second timeout — prevents app from hanging if backend is slow/offline
   headers: {
     'Content-Type': 'application/json',
   },

@@ -38,9 +38,11 @@ export default function HomeScreen() {
   const [timeLeft, setTimeLeft] = useState<{[key: string]: {hours: number, minutes: number}}>({});
 
   useEffect(() => {
+    // Reset purchase flow state on launch (does not touch persistent purchases)
     resetForNewPurchase();
-    initializeData();
     loadActivePurchases();
+    // Fire-and-forget seed call — never blocks UI or hangs the app
+    initializeData();
   }, []);
 
   // Update timer every minute
@@ -66,13 +68,11 @@ export default function HomeScreen() {
   }, []);
 
   const initializeData = async () => {
+    // Best-effort backend warm-up. Failures are silent and never block the UI.
     try {
-      setIsSeeding(true);
       await seedData();
     } catch (error) {
-      console.log('Data may already be seeded:', error);
-    } finally {
-      setIsSeeding(false);
+      console.log('[Home] seedData failed (non-fatal):', error);
     }
   };
 
