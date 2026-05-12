@@ -7,7 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   Modal,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -16,10 +16,9 @@ import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
 import { seedData, getZipCodesByApp, getGuidesByApp } from '../src/services/api';
 
-const { width } = Dimensions.get('window');
-
 export default function HomeScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { language, setLanguage, t } = useLanguageStore();
   const { 
     resetForNewPurchase, 
@@ -584,7 +583,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundLight,
     borderRadius: 20,
     padding: 20,
-    width: width * 0.8,
+    width: '80%',
     maxWidth: 300,
     borderWidth: 1,
     borderColor: COLORS.accent,

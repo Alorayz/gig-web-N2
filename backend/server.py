@@ -1840,7 +1840,7 @@ async def validate_apple_receipt(data: IAPReceiptValidation):
         "exclude-old-transactions": True
     }
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=20.0) as client:
         # Try production first
         response = await client.post(APPLE_PRODUCTION_URL, json=payload)
         result = response.json()

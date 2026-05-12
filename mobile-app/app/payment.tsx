@@ -65,57 +65,56 @@ export default function PaymentScreen() {
 
     appleIAPService.setupListeners(
       async (purchase) => {
-        // Purchase completed successfully
+        // ✅ APPLE HAS CONFIRMED THE PURCHASE — UNLOCK IMMEDIATELY.
+        // Backend validation is best-effort for our own records; it must NEVER
+        // block the user or show an error, because Apple has already validated
+        // and charged the customer. Doing so causes App Review rejection
+        // (Guideline 2.1b - "error after purchase").
         if (processingRef.current) return;
         processingRef.current = true;
 
         try {
+          // 1) Finish the StoreKit transaction so Apple stops re-delivering it
+          try {
+            await appleIAPService.finish(purchase);
+          } catch (finishErr) {
+            console.log('[IAP] finishTransaction warning (non-fatal):', finishErr);
+          }
+
+          // 2) Unlock content for the user IMMEDIATELY (local state + 15-day timer)
+          await completePayment();
+
+          // 3) Fire-and-forget: report receipt to backend for our records.
+          //    If it fails (network, server down, slow), the user is unaffected.
           const receipt = purchase.transactionReceipt;
           const productId = purchase.productId || getProductId(selectedApp || 'instacart');
-
-          // Validate receipt with backend
-          const result = await validateIAPReceipt(receipt, productId, userIdToUse);
-
-          if (result && result.is_valid) {
-            await appleIAPService.finish(purchase);
-            await completePayment();
-          } else {
-            // Even if backend validation fails, finish transaction to avoid duplicate charges
-            await appleIAPService.finish(purchase);
-            setPaymentStatus('failed');
-            Alert.alert(
-              'Error',
-              language === 'en' 
-                ? 'Purchase could not be verified. Please contact support.' 
-                : 'La compra no pudo ser verificada. Contacte soporte.',
-              [{ text: 'OK', onPress: () => { setPaymentStatus('ready'); processingRef.current = false; } }]
-            );
-          }
+          validateIAPReceipt(receipt, productId, userIdToUse)
+            .then((res) => console.log('[IAP] Backend receipt logged:', res?.is_valid))
+            .catch((e) => console.log('[IAP] Backend receipt log failed (non-fatal):', e?.message));
         } catch (error) {
-          console.error('Purchase processing error:', error);
-          try { await appleIAPService.finish(purchase); } catch (e) {}
-          setPaymentStatus('failed');
-          Alert.alert('Error', language === 'en' ? 'An error occurred.' : 'Ocurrio un error.',
-            [{ text: 'OK', onPress: () => { setPaymentStatus('ready'); processingRef.current = false; } }]
-          );
+          // ⚠️ Only reached if completePayment itself crashes. Even then we
+          // do NOT show an error popup — Apple has already charged the user.
+          console.error('[IAP] Post-purchase unlock error (non-fatal):', error);
         }
       },
       (error) => {
-        // Purchase error/cancellation
-        console.log('Purchase error:', error);
+        // Purchase error/cancellation (BEFORE Apple confirms the sale)
+        console.log('[IAP] Purchase error:', error);
         processingRef.current = false;
-        if (error?.code === 'E_USER_CANCELLED' || error?.message?.includes('cancel')) {
-          setPaymentStatus('ready');
-        } else {
-          setPaymentStatus('ready');
-          // Don't show alert for cancellation, only for real errors
-          if (error?.code !== 'E_USER_CANCELLED') {
-            Alert.alert(
-              language === 'en' ? 'Purchase Error' : 'Error de Compra',
-              error?.message || (language === 'en' ? 'Could not complete purchase.' : 'No se pudo completar la compra.'),
-              [{ text: 'OK' }]
-            );
-          }
+        setPaymentStatus('ready');
+        // Never show an alert for cancellation; only for real, pre-purchase errors
+        const code = error?.code;
+        const msg = (error?.message || '').toLowerCase();
+        const isCancel = code === 'E_USER_CANCELLED'
+          || code === 'E_USER_CANCEL'
+          || msg.includes('cancel')
+          || msg.includes('paymentcancelled');
+        if (!isCancel && code && code !== 'E_UNKNOWN') {
+          Alert.alert(
+            language === 'en' ? 'Purchase Error' : 'Error de Compra',
+            error?.message || (language === 'en' ? 'Could not complete purchase.' : 'No se pudo completar la compra.'),
+            [{ text: 'OK' }]
+          );
         }
       }
     );

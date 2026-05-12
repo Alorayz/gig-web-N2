@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   Linking,
   Alert,
   ActivityIndicator,
@@ -16,12 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguageStore, COLORS } from '../src/stores/languageStore';
 import { useAppStore } from '../src/stores/appStore';
 
-const { width } = Dimensions.get('window');
-
 type TabType = 'zipcodes' | 'guide' | 'voice';
 
 export default function ResultsScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { language, t } = useLanguageStore();
   const { selectedApp, zipCodes, guides, voiceGuides, paymentComplete, isAppActive, reset } = useAppStore();
   const [activeTab, setActiveTab] = useState<TabType>('zipcodes');
